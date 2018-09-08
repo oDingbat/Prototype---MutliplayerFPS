@@ -53,9 +53,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData_MasterServer:
     MAX_CONNECTION: 100
-    port: 3333
+    port: 66666
     hostId: 0
-    ourConnectionId: 0
+    connectionId: 0
     ipAddress: 127.0.0.1
     error: 0
     tickRate: 64
@@ -65,3 +65,21 @@ MonoBehaviour:
     channelUnreliable: 0
     channelReliableFragmentedSequenced: 0
     channelReliableSequenced: 0
+  connectionData_GameServer:
+    MAX_CONNECTION: 100
+    port: 55555
+    hostId: 0
+    connectionId: 0
+    ipAddress: 
+    error: 0
+    tickRate: 64
+    isConnected: 0
+    isAttemptingConnection: 0
+    channelReliable: 0
+    channelUnreliable: 0
+    channelReliableFragmentedSequenced: 0
+    channelReliableSequenced: 0
+  players: []
+  entityIteration: 0
+  prefab_Player: {fileID: 1633532524445638, guid: 9e983d22fe41a7543abba59b3166af59,
+    type: 2}
