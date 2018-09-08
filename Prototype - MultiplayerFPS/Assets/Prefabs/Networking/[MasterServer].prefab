@@ -53,7 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData:
     MAX_CONNECTION: 100
-    port: 66666
+    port: 6666
     hostId: 0
     connectionId: 0
     ipAddress: 127.0.0.1
@@ -67,3 +67,9 @@ MonoBehaviour:
     channelReliableSequenced: 0
   gameServers: []
   clients: []
+  clientsWaitingForGameServer: []
+  text_Debug_ServerOnline: {fileID: 0}
+  text_Debug_GameServer: {fileID: 0}
+  text_Debug_Clients: {fileID: 0}
+  color_textRed: {r: 1, g: 0.22352941, b: 0.22352941, a: 1}
+  color_textGreen: {r: 0.47058824, g: 1, b: 0.1764706, a: 1}

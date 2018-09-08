@@ -65,6 +65,13 @@ public class Player : Entity {
 		// Get rotation input
 		rotationDesired = new Vector3(Mathf.Clamp(rotationDesired.x - Input.GetAxis("Mouse Y"), -90f, 90f), rotationDesired.y + Input.GetAxis("Mouse X"), 0);
 
+		if (Input.GetKeyDown(KeyCode.Escape)) {
+			Application.Quit();
+		}
+
+		if (Input.GetMouseButtonDown(0)) {
+			Cursor.visible = false;
+		}
 
 		if (Input.GetKeyDown(KeyCode.Space)) {
 			rigidbody.velocity += new Vector3(0, 5f, 0);

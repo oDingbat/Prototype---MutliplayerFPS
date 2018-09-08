@@ -53,10 +53,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData_MasterServer:
     MAX_CONNECTION: 100
-    port: 66666
+    port: 6666
     hostId: 0
     connectionId: 0
-    ipAddress: 127.0.0.1
+    ipAddress: 142.93.254.185
     error: 0
     tickRate: 64
     isConnected: 0
@@ -67,7 +67,7 @@ MonoBehaviour:
     channelReliableSequenced: 0
   connectionData_GameServer:
     MAX_CONNECTION: 100
-    port: 55555
+    port: 5555
     hostId: 0
     connectionId: 0
     ipAddress: 
@@ -81,6 +81,8 @@ MonoBehaviour:
     channelReliableSequenced: 0
   requestedGameServer: 0
   camera_MainMenu: {fileID: 0}
+  clientPlayer: {fileID: 0}
+  ourClientId: 0
   container_Entities: {fileID: 0}
   container_Environemnt: {fileID: 0}
   text_Error: {fileID: 0}

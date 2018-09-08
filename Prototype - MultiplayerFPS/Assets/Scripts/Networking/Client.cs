@@ -83,9 +83,9 @@ public class Client : MonoBehaviour {
 			HostTopology topo = new HostTopology(newConnectionConfig, connectionData_GameServer.MAX_CONNECTION);       // Setup topology
 			connectionData_GameServer.hostId = NetworkTransport.AddHost(topo, 0);                                         // Gets the Id for the host
 
-			UnityEngine.Debug.Log("Connecting with Ip: " + connectionData_GameServer.ipAddress + " port: " + connectionData_GameServer.port);
+			UnityEngine.Debug.Log("Connecting with Ip: " + connectionData_MasterServer.ipAddress + " port: " + connectionData_GameServer.port);
 			
-			connectionData_GameServer.connectionId = NetworkTransport.Connect(connectionData_GameServer.hostId, connectionData_GameServer.ipAddress, connectionData_GameServer.port, 0, out connectionData_GameServer.error);   // Gets the Id for the connection (not the same as ourClientId)
+			connectionData_GameServer.connectionId = NetworkTransport.Connect(connectionData_GameServer.hostId, connectionData_MasterServer.ipAddress, connectionData_GameServer.port, 0, out connectionData_GameServer.error);   // Gets the Id for the connection (not the same as ourClientId)
 
 			connectionData_GameServer.isAttemptingConnection = true;
 		}
@@ -136,6 +136,7 @@ public class Client : MonoBehaviour {
 						connectionData_MasterServer.isAttemptingConnection = false;
 						Send_Data_Client();
 					} else {
+						Cursor.visible = false;
 						UnityEngine.Debug.Log("Successfully connected to game server!");
 						connectionData_GameServer.isConnected = true;
 						connectionData_GameServer.isAttemptingConnection = false;
@@ -197,6 +198,10 @@ public class Client : MonoBehaviour {
 				case "Data_GameServerInfo":
 					Receive_Data_GameServerInfo(connectionId, splitData);
 					break;
+
+				case "Error_IncorrectVersionNumber":
+					Receive_Error_IncorrectVersionNumber(connectionId, splitData);
+					break;
 			}
 		}
 	}
@@ -206,6 +211,7 @@ public class Client : MonoBehaviour {
 	private void OnDisconnectFromGameServer () {
 		panel_MainMenu.SetActive(true);
 		camera_MainMenu.gameObject.SetActive(true);
+		Cursor.visible = true;
 		DestroyWorld();
 		text_Error.text = "Error: disconnected from game server";
 	}
@@ -276,6 +282,9 @@ public class Client : MonoBehaviour {
 		string[] entityData = splitData[1].Split('%');
 		CreateEntity(entityData);
 	}
+	private void Receive_Error_IncorrectVersionNumber (int connectionId, string[] splitData) {
+		Debug.Log(splitData[0]);
+	}
 	private void CreateEntity (string[] entityData) {
 		// Get Entity Information
 		
@@ -286,7 +295,7 @@ public class Client : MonoBehaviour {
 
 		switch (entityType) {
 			case ("Player"):
-				Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity).GetComponent<Player>();
+				Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 				newEntity = newPlayer;
 				break;
 		}
@@ -322,7 +331,7 @@ public class Client : MonoBehaviour {
 	#endregion
 
 	#region Send Methods
-	public void Send_Request_GameServerDetails() {
+	public void Send_Request_GameServerDetails () {
 		// Sends a request message to MasterServer, asking for a GameServer's details in order to join
 
 		if (requestedGameServer == true) {									// Make sure we haven't already requested a GameServer
@@ -357,7 +366,9 @@ public class Client : MonoBehaviour {
 	private void Send_Data_Client () {
 		UnityEngine.Debug.Log("Sending master server our client data.");
 
-		string clientData = "Data_ClientConnected";
+		// ClientData format:		{ Data_ClientConnected | VersionNumber
+
+		string clientData = "Data_ClientConnected|" + Version.GetVersionNumber();
 
 		SendToMasterServer(clientData, connectionData_MasterServer.channelReliable);
 	}

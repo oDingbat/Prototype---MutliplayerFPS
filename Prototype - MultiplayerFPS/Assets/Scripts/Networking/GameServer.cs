@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.UI;
 
 public class GameServer : MonoBehaviour {
 
@@ -25,7 +26,8 @@ public class GameServer : MonoBehaviour {
 	public class ConnectedPlayer {
 		public string name;             // The name of the player
 		public int connectionId;        // The connectionId of the player
-		public int entityId;			// The entityId of the client's player controller
+		public int entityId;            // The entityId of the client's player controller
+		public Player playerEntity;		// The entity that belongs to this player
 
 		public ConnectedPlayer (string _name, int _connectionId) {
 			connectionId = _connectionId;
@@ -36,26 +38,26 @@ public class GameServer : MonoBehaviour {
 	[Space(10)][Header("Prefabs")]
 	public GameObject prefab_Player;
 
+	float timeReachedPopulationZero = 30;           // The time at which the GameServer reached a population of zero (starts at 30 to give the gameserver 30 seconds to get populated)
+	float populationZeroTimoutBuffer = 3f;			// The amount of time the GameServer will wait before it times out once the server pop reaches zero
+
+	[Space(10)][Header("UI")]
+	public Text text_Debug_MasterServer;
+	public Text text_Debug_Clients;
+	public Text text_Debug_Entities;
+	public Color color_textRed;
+	public Color color_textGreen;
+
 	#region Initial Methods
 	private void Start() {
 		GetInitialReferences();
-		StartCoroutine(InitializeServer());
+		ConnectToMasterServer();
 		StartCoroutine(TickUpdate());
 	}
 	private void GetInitialReferences() {
 		// Gets initial references
 		container_Entities = GameObject.Find("[Entities]").transform;
 		container_Environemnt = GameObject.Find("[Environment]").transform;
-	}
-	IEnumerator InitializeServer () {
-		InitializeGameServer();
-
-		while (connectionData_GameServer.isConnected == false) {
-			Debug.Log("Waiting for GameServer to start...");
-			yield return new WaitForSeconds(2f);
-		}
-
-		ConnectToMasterServer();
 	}
 	public void ConnectToMasterServer () {
 		// This method connects the GameServer to the MasterServer
@@ -96,9 +98,9 @@ public class GameServer : MonoBehaviour {
 
 		HostTopology topology = new HostTopology(newConnectionConfig, connectionData_GameServer.MAX_CONNECTION);      // Setup topology
 
-		connectionData_GameServer.hostId = NetworkTransport.AddHost(topology, 0);
+		connectionData_GameServer.hostId = NetworkTransport.AddHost(topology, connectionData_GameServer.port);
 
-		connectionData_GameServer.port = NetworkTransport.GetHostPort(connectionData_GameServer.hostId);
+		//connectionData_GameServer.port = NetworkTransport.GetHostPort(connectionData_GameServer.hostId);
 
 		connectionData_GameServer.isConnected = true;
 		UnityEngine.Debug.Log("Server initialized successfully!");
@@ -108,10 +110,13 @@ public class GameServer : MonoBehaviour {
 	#region Update Methods
 	private IEnumerator TickUpdate() {
 		// This method is used to receive and send information back and forth between the connected server. It's tick rate depends on the variable tickRate
-
+		
 		float tickDelay = 1f / connectionData_MasterServer.tickRate;
 
 		while (true) {
+			UpdateDebugWindow();
+			UpdateTimeout();
+
 			if (connectionData_MasterServer.isAttemptingConnection || connectionData_MasterServer.isConnected || connectionData_GameServer.isConnected) {
 				UpdateReceive();
 			}
@@ -119,6 +124,23 @@ public class GameServer : MonoBehaviour {
 				UpdateSend();
 			}
 			yield return new WaitForSeconds(tickDelay);
+		}
+	}
+	private void UpdateDebugWindow() {
+		text_Debug_MasterServer.text = "Master Server: " + (connectionData_MasterServer.isConnected ? "Yes" : "No");
+		text_Debug_MasterServer.color = (connectionData_MasterServer.isConnected ? color_textGreen : color_textRed);
+
+		text_Debug_Clients.text = "Clients: " + players.Count;
+		text_Debug_Clients.color = players.Count > 0 ? color_textGreen : color_textRed;
+
+		text_Debug_Entities.text = "Entities: " + entities.Count;
+		text_Debug_Entities.color = entities.Count > 0 ? color_textGreen : color_textRed;
+	}
+	private void UpdateTimeout () {
+		if (players.Count == 0) {
+			if (timeReachedPopulationZero + populationZeroTimoutBuffer <= Time.time) {
+				Application.Quit();		// Close the GameServer application
+			}
 		}
 	}
 	private void UpdateSend() {
@@ -143,7 +165,7 @@ public class GameServer : MonoBehaviour {
 
 			switch (recData) {
 				case NetworkEventType.ConnectEvent:
-					if (recHostId == connectionData_MasterServer.hostId) {		// Is this Connect from MasterServer?
+					if (recHostId == connectionData_MasterServer.hostId) {      // Is this Connect from MasterServer?
 						OnConnectMasterServer();
 					} else {
 						OnClientConnect(connectionId);
@@ -153,6 +175,9 @@ public class GameServer : MonoBehaviour {
 					ParseData(connectionId, channelId, recBuffer, dataSize);
 					break;
 				case NetworkEventType.DisconnectEvent:
+
+					Debug.Log("DISCONNECT : " + recHostId + " - " + connectionData_MasterServer.hostId);
+
 					if (recHostId == connectionData_MasterServer.hostId) {      // Is this Disconnect from MasterServer?
 						OnDisconnectMasterServer();
 					} else {
@@ -177,6 +202,9 @@ public class GameServer : MonoBehaviour {
 				case "Data_PlayerUpdate":
 					Receive_Data_PlayerUpdate(connectionId, splitData);
 					break;
+				case "Data_GameServerPort":
+					Receive_Data_GameServerPort(connectionId, splitData);			// TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
+					break;
 			}
 		}
 	}
@@ -193,11 +221,19 @@ public class GameServer : MonoBehaviour {
 		Debug.Log("MasterServer Disconnected!");
 		connectionData_MasterServer.isConnected = false;
 		connectionData_MasterServer.isAttemptingConnection = false;
+		Application.Quit();													// TODO: attempt to reconnect first?
 	}
 	private void OnClientConnect (int connectionId) {
 		// Send this client their specific connectionId (so they know which player entity is theirs)
+
+		// Create a new player
+		players.Add(new ConnectedPlayer("N", connectionId));
+
 		string newMessage = "Data_GameServerInfo|" + connectionId;
 		Send(newMessage, connectionData_GameServer.channelReliable, connectionId);
+
+		// Update MasterServer's info on this GameServer
+		Send_Data_GameServerInfo();
 	}
 	private void OnClientDisconnect (int connectionId) {
 		if (players.Exists(p => p.connectionId == connectionId)) {
@@ -206,6 +242,14 @@ public class GameServer : MonoBehaviour {
 
 			// Destroy player's entity
 			Entity_Destroy(disconnectedPlayer.entityId);
+
+			// Check if we need to set populationTimer
+			if (players.Count == 0) {
+				timeReachedPopulationZero = Time.time;
+			}
+
+			// Update MasterServer's info on this GameServer
+			Send_Data_GameServerInfo();
 		}
 	}
 	private void KickPlayer (int connectionId, string reason = "Unspecified") {
@@ -241,12 +285,12 @@ public class GameServer : MonoBehaviour {
 	#region Receive Methods
 	private void Receive_Data_PlayerDetails (int connectionId, string[] splitData) {
 		if (VerifySplitData(connectionId, splitData, 2)) {
-			if (players.Exists(p => p.connectionId == connectionId) == false) {				// Make sure a player with this connectionId doesn't already exist
+			if (players.Single(p => p.connectionId == connectionId).playerEntity == null) {				// Make sure this player doesn't already have a playerEntity
 				// Add player to players list
 				string playerName = splitData[1];
 
 				if (playerName.Length >= 3 && IsLettersOrDigits(playerName) == true) {        // Verify player name integrity		// TODO: Check for racism, etc?
-					players.Add(new ConnectedPlayer(playerName, connectionId));
+					players.Single(p => p.connectionId == connectionId).name = playerName;
 
 					Send_Data_InitializeAllEntities(connectionId);
 					SpawnPlayer(connectionId);				// Spawn this newly connected client a player entity
@@ -261,35 +305,55 @@ public class GameServer : MonoBehaviour {
 	private void Receive_Data_PlayerUpdate (int connectionId, string[] splitData) {
 		if (VerifySplitData(connectionId, splitData, 2)) {
 			// Find entityId of this player
-			int entityId = players.Single(p => p.connectionId == connectionId).entityId;
+			Entity playerEntity = players.Single(p => p.connectionId == connectionId).playerEntity;
 
-			// Create EntityUpdate data
-			string entityUpdateData = splitData[1];
+			if (playerEntity != null) {				// Make sure this player's entity exists
+				// Create EntityUpdate data
+				string entityUpdateData = splitData[1];
 
-			// Update ServerSide Entity
-			entities[entityId].UpdateEntity(entityUpdateData.Split('%'));
+				// Update ServerSide Entity
+				playerEntity.UpdateEntity(entityUpdateData.Split('%'));
 
-			// Create an entityUpdate message to send to all clients
-			string newMessage = "Data_UpdateEntity|" + entityId + "|" + entityUpdateData;
+				// Create an entityUpdate message to send to all clients
+				string newMessage = "Data_UpdateEntity|" + playerEntity.entityId + "|" + entityUpdateData;
 
-			// Send EntityUpdate to all players (excluding the player who sent this player update)
-			List<ConnectedPlayer> playersExcludingSender = players.Where(p => p.connectionId != connectionId).ToList();			// Make a new list of all players exluding the player this entity belongs to
-			Send(newMessage, connectionData_GameServer.channelUnreliable, playersExcludingSender);
+				// Send EntityUpdate to all players (excluding the player who sent this player update)
+				List<ConnectedPlayer> playersExcludingSender = players.Where(p => p.connectionId != connectionId).ToList();         // Make a new list of all players exluding the player this entity belongs to
+				Send(newMessage, connectionData_GameServer.channelUnreliable, playersExcludingSender);
+			}
 		}
+	}
+	private void Receive_Data_GameServerPort (int connectionId, string[] splitData) {
+		// Updates this GameServer's port specification which is later used to start up GameServer's server
+
+		connectionData_GameServer.port = int.Parse(splitData[1]);
+
+		Debug.Log("Obtained port from MasterServer: " + connectionData_GameServer.port);
+		InitializeGameServer();
 	}
 	#endregion
 
 	#region Send Methods
+	private void Send_Data_GameServerInfo () {
+		// Sends GameServer info to the MasterServer so the MasterServer can update it's information on this GameServer
+
+		string newMessage = "Data_GameServerInfo|";
+		newMessage += players.Count;
+
+		SendToMasterServer(newMessage, connectionData_MasterServer.channelReliableSequenced);
+	}
 	private void SpawnPlayer (int connectionId) {
 		// Initializes new client's player entity and tells the new client the details
 
 		// Create new player entity and add it to the server's list of entities
-		Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity).GetComponent<Player>();
+		Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 		ConnectedPlayer cPlayer = players.Single(p => p.connectionId == connectionId);
 		Entity newEntity = newPlayer;
 
 		// Add player to entities
+		cPlayer.playerEntity = newPlayer;
 		cPlayer.entityId = entityIteration;
+		newPlayer.entityId = entityIteration;
 		entities.Add(entityIteration, newPlayer);
 
 		// Structure: { EntityId | EntityType | EntityData }
@@ -336,8 +400,9 @@ public class GameServer : MonoBehaviour {
 	private void Send_Data_GameServer () {
 		Debug.Log("Sending master server our server data.");
 
-		string gameServerData = "Data_GameServerConnected|" + connectionData_GameServer.port;
-		Debug.Log(gameServerData);
+		// GameServerData format:		{ Data_GameServerConnected | VersionNumber | portNumber
+
+		string gameServerData = "Data_GameServerConnected|" + Version.GetVersionNumber();
 
 		SendToMasterServer(gameServerData, connectionData_MasterServer.channelReliable);
 	}

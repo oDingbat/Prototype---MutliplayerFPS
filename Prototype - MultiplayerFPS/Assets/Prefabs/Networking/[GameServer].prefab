@@ -53,7 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData_MasterServer:
     MAX_CONNECTION: 100
-    port: 66666
+    port: 6666
     hostId: 0
     connectionId: 0
     ipAddress: 127.0.0.1
@@ -67,7 +67,7 @@ MonoBehaviour:
     channelReliableSequenced: 0
   connectionData_GameServer:
     MAX_CONNECTION: 100
-    port: 55555
+    port: 5555
     hostId: 0
     connectionId: 0
     ipAddress: 
@@ -80,6 +80,13 @@ MonoBehaviour:
     channelReliableFragmentedSequenced: 0
     channelReliableSequenced: 0
   players: []
+  container_Entities: {fileID: 0}
+  container_Environemnt: {fileID: 0}
   entityIteration: 0
   prefab_Player: {fileID: 1633532524445638, guid: 9e983d22fe41a7543abba59b3166af59,
     type: 2}
+  text_Debug_MasterServer: {fileID: 0}
+  text_Debug_Clients: {fileID: 0}
+  text_Debug_Entities: {fileID: 0}
+  color_textRed: {r: 1, g: 0.2216981, b: 0.2216981, a: 1}
+  color_textGreen: {r: 0.4711701, g: 1, b: 0.1745283, a: 1}
