@@ -22,8 +22,10 @@ public class Client : MonoBehaviour {
 	public Transform container_Environemnt;
 
 	[Space(10)][Header("UI References")]
+	public UIManager uiManager;
 	public Text text_Error;
 	public Text text_Name;
+	public Text text_Highscore;
 	public GameObject panel_MainMenu;
 
 	[Space(10)][Header("Prefabs")]
@@ -41,6 +43,7 @@ public class Client : MonoBehaviour {
 		// Gets initial references
 		container_Entities = GameObject.Find("[Entities]").transform;
 		container_Environemnt = GameObject.Find("[Environment]").transform;
+		uiManager = GameObject.Find("[UIManager]").GetComponent<UIManager>();
 	}
 	private void ConnectToMasterServer () {
 		// This method connects the Client to the MasterServer
@@ -202,6 +205,10 @@ public class Client : MonoBehaviour {
 				case "Error_IncorrectVersionNumber":
 					Receive_Error_IncorrectVersionNumber(connectionId, splitData);
 					break;
+
+				case "Data_Highscore":
+					Receive_Data_Highscore(connectionId, splitData);
+					break;
 			}
 		}
 	}
@@ -209,7 +216,7 @@ public class Client : MonoBehaviour {
 
 	#region Connection/Disconnection Methods
 	private void OnDisconnectFromGameServer () {
-		panel_MainMenu.SetActive(true);
+		uiManager.ToggleMainMenu(true);
 		camera_MainMenu.gameObject.SetActive(true);
 		Cursor.visible = true;
 		DestroyWorld();
@@ -328,9 +335,18 @@ public class Client : MonoBehaviour {
 			entities.Remove(entityId);
 		}
 	}
+	private void Receive_Data_Highscore (int connectionId, string[] splitData) {
+		string highscore = splitData[1];
+		text_Highscore.text = highscore;
+	}
 	#endregion
 
 	#region Send Methods
+	public void Send_Data_PersonalHighscore (int personalHighscore) {
+		Debug.Log("SENDING");
+		string newMessage = "Data_PersonalHighscore|" + personalHighscore;
+		SendToGameServer(newMessage, connectionData_GameServer.channelReliable);
+	}
 	public void Send_Request_GameServerDetails () {
 		// Sends a request message to MasterServer, asking for a GameServer's details in order to join
 
@@ -374,7 +390,7 @@ public class Client : MonoBehaviour {
 	}
 	private void Send_Data_PlayerDetails () {
 		// Hide UI
-		panel_MainMenu.SetActive(false);
+		uiManager.ToggleMainMenu(false);
 
 		// Send Player Details to GameServer
 		string newMessage = "Data_PlayerDetails|" + text_Name.text;

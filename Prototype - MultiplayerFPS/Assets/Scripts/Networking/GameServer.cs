@@ -22,12 +22,16 @@ public class GameServer : MonoBehaviour {
 	public Dictionary<int, Entity> entities = new Dictionary<int, Entity>();
 	public int entityIteration;
 
+	public int highscore;
+	public string highscoreName;
+
 	[System.Serializable]
 	public class ConnectedPlayer {
 		public string name;             // The name of the player
 		public int connectionId;        // The connectionId of the player
 		public int entityId;            // The entityId of the client's player controller
-		public Player playerEntity;		// The entity that belongs to this player
+		public Player playerEntity;     // The entity that belongs to this player
+		public int personalHighscore;	// The personal highscore of this player
 
 		public ConnectedPlayer (string _name, int _connectionId) {
 			connectionId = _connectionId;
@@ -161,7 +165,7 @@ public class GameServer : MonoBehaviour {
 		NetworkEventType recData = NetworkEventType.Nothing;
 		do {        // Do While ensures that we process all of the sent messages each tick
 			recData = NetworkTransport.Receive(out recHostId, out connectionId, out channelId, recBuffer, recBuffer.Length, out dataSize, out error);
-			//Debug.Log(recData);
+			Debug.Log(recData);
 
 			switch (recData) {
 				case NetworkEventType.ConnectEvent:
@@ -205,6 +209,9 @@ public class GameServer : MonoBehaviour {
 				case "Data_GameServerPort":
 					Receive_Data_GameServerPort(connectionId, splitData);			// TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
 					break;
+				case "Data_PersonalHighscore":
+					Receive_Data_PersonalHighscore(connectionId, splitData);           // TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
+					break;
 			}
 		}
 	}
@@ -228,6 +235,7 @@ public class GameServer : MonoBehaviour {
 
 		// Create a new player
 		players.Add(new ConnectedPlayer("N", connectionId));
+		Send_Data_Highscore();
 
 		string newMessage = "Data_GameServerInfo|" + connectionId;
 		Send(newMessage, connectionData_GameServer.channelReliable, connectionId);
@@ -331,6 +339,18 @@ public class GameServer : MonoBehaviour {
 		Debug.Log("Obtained port from MasterServer: " + connectionData_GameServer.port);
 		InitializeGameServer();
 	}
+	private void Receive_Data_PersonalHighscore (int connectionId, string[] splitData) {
+		if (VerifySplitData(connectionId, splitData, 2)) {
+			int newHighscore = int.Parse(splitData[1]);
+			players.Single(p => p.connectionId == connectionId).personalHighscore = newHighscore;
+
+			if (newHighscore > highscore) {
+				highscore = newHighscore;
+				highscoreName = players.Single(p => p.connectionId == connectionId).name;
+				Send_Data_Highscore();
+			}
+		}
+	}
 	#endregion
 
 	#region Send Methods
@@ -405,6 +425,10 @@ public class GameServer : MonoBehaviour {
 		string gameServerData = "Data_GameServerConnected|" + Version.GetVersionNumber();
 
 		SendToMasterServer(gameServerData, connectionData_MasterServer.channelReliable);
+	}
+	private void Send_Data_Highscore () {
+		string msg = "Data_Highscore|" + (highscoreName + ": " + highscore);
+		Send(msg, connectionData_GameServer.channelReliable, players);
 	}
 	private void Send (string message, int channelId, ConnectedPlayer player) {
 		List<ConnectedPlayer> playersList = new List<ConnectedPlayer>();

@@ -17,7 +17,7 @@ public class MasterServer : MonoBehaviour {
 	[Space(10)][Header("Connected Systems")]
 	public List<ConnectedGameServer> gameServers;		// List of gameServers connected to this masterServer
 	public List<ConnectedClient> clients;               // List of clients connected to this masterServer
-	int gameServerPopCap = 3;
+	int gameServerPopCap = 100;
 
 	public List<ConnectedClient> clientsWaitingForGameServer;       // List of clients currently waiting for a gameServer to open
 	float timeLastAttemptedGameServerLaunch = -Mathf.Infinity;
