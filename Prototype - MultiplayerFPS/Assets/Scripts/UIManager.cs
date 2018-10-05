@@ -16,7 +16,9 @@ public class UIManager : MonoBehaviour {
 	public bool isPaused;
 
 	private void Start () {
-		client = GameObject.Find("[Client]").GetComponent<Client>();
+		if (GameObject.Find("[Client]") != null) {
+			client = GameObject.Find("[Client]").GetComponent<Client>();
+		}
 	}
 
 	private void Update() {

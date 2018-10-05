@@ -12,7 +12,9 @@ public class Player : Entity {
 	public int ownerClientId;
 
 	[Space(10)][Header("References")]
+	public AudioManager audioManager;
 	public Camera camera;                   // The camera attached to this player
+	public Transform head;
 	public CapsuleCollider collider;
 	public Rigidbody rigidbody;
 	public GizmoWizard gizmoWizard;
@@ -24,30 +26,47 @@ public class Player : Entity {
 
 	[Space(10)][Header("Movement Settings")]
 	public LayerMask collisionMask;
-	float slopeMax = 50;
-	float skinWidth = 0.001f;
-	bool isGrounded = false;
+	public float slopeMax = 50;										// The maximum slope angle the player can climb
+	public float skinWidth = 0.001f;
+	public float speed = 14f;                                       // Maximum speed walking
+	public float speedCrouching = 6f;								// Maximum speed crouching
+	public float speedMax = 30f;                                    // Maximum possible spee
+	public float accelerationStrafing = 3f;							// The acceleration constant which is applied to the player's speed while strafing
+	
+	bool isGrounded = false;										// Is the player current on the ground?
+	bool isCrouching = false;
+	bool isSneaking = false;
 	float timeLastGrounded = -Mathf.Infinity;
 	float timeLastJumped = -Mathf.Infinity;
 	float timeLastPressedJump = -Mathf.Infinity;
-
+	float timeLastLanded;
+	float headHeightStanding = 0.9f;
+	float headHeightCrouching = -0.1f;
+	
 	[Space(10)][Header("UI")]
 	public Text text_SpeedOMeter;
 	public int personalHighscore;
-	public bool hasGrapple;
 
 	// Movement Variables
 	Vector3 inputMovement;                  // The input for the player's movement
+	public Vector3 positionLastStepped;
 	public Vector3 velocity;
 	public Vector3 rotationDesired;
 	public Vector3 rotationDesiredLerp;
 	public Vector3 groundNormal;
 	public Vector3 positionDesired;
-	float speed = 10f;
-	float speedMax = 65f;
-	
+	public Vector3 headVelocity;
+	public Vector3 headVelocityDesired;
+	public float headVelocityMultiplier;
+
+	[Space(10)][Header("Audio")]
+	public AudioClip clip_Footstep;
+	public AudioSource audioSource_Wind;
+
 	private void Start () {
 		uiManager = GameObject.Find("[UIManager]").GetComponent<UIManager>();
+		head = transform.Find("[Camera] (Player)");
+		audioManager = GameObject.Find("[AudioManager]").GetComponent<AudioManager>();
 	}
 
 	private void Update() {
@@ -96,17 +115,22 @@ public class Player : Entity {
 		
 		// Get rotation input
 		if (uiManager.isPaused == false) {
-			float zoomMultiplier = Mathf.Lerp(1f, weapons[weaponCurrentIndex].attributes.zoomFOVMultiplier, weapons[weaponCurrentIndex].attributes.zoomCurrent);
+			float zoomMultiplier = Mathf.Lerp(1f, (weapons[weaponCurrentIndex].attributes.zoomFOVMultiplier * 1f), weapons[weaponCurrentIndex].attributes.zoomCurrent * 0.5f);
 			rotationDesired = new Vector3(Mathf.Clamp(rotationDesired.x - (Input.GetAxis("Mouse Y") * zoomMultiplier), -90f, 90f), rotationDesired.y + (Input.GetAxis("Mouse X") * zoomMultiplier), 0);
 		}
 
 		if (Input.GetMouseButtonDown(0)) {
+			Cursor.visible = false;
+			Cursor.lockState = CursorLockMode.None;
+			Cursor.lockState = CursorLockMode.Locked;
 			AttemptFireWeapon();
 		}
+		
+		// Crouching
+		isCrouching = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.C);
 
-		if (Input.GetKeyDown(KeyCode.LeftShift)) {
-			
-		}
+		// Sneaking
+		isSneaking = (Input.GetKey(KeyCode.LeftShift) && isCrouching == false);
 
 		UpdateWeapon();
 		
@@ -134,20 +158,26 @@ public class Player : Entity {
 			// Update velocity
 			Vector3 horizontalDirection = Vector3.ProjectOnPlane(new Vector3(velocity.x, 0, velocity.z).normalized, groundNormal);
 			float slopeSpeedModification = Mathf.Sign(horizontalDirection.y) == 1 ? (1 - (horizontalDirection.y * 0.25f)) : (1 - (horizontalDirection.y * 1f));
-			
-			Vector3 desiredVelocity = transform.rotation * inputMovement * speed * slopeSpeedModification;
-			float currentVelocityMagnitude = new Vector3(velocity.x, 0, velocity.z).magnitude;
-			if (isGrounded == false && desiredVelocity.magnitude < currentVelocityMagnitude) {
-				desiredVelocity = desiredVelocity.normalized * currentVelocityMagnitude;
-			}
+
+			bool isCrouchWalking = ((isCrouching == true || isSneaking == true || (head.localPosition.y < headHeightStanding * 0.5f)) && timeLastGrounded + 0.2f >= Time.time);
 
 			Vector3 horizontalVelocity = new Vector3(velocity.x, 0, velocity.z);
+			Vector3 desiredVelocity = transform.rotation * inputMovement * (isCrouchWalking ? speedCrouching : speed) * slopeSpeedModification;
+			float currentVelocityMagnitude = new Vector3(velocity.x, 0, velocity.z).magnitude;
+			if ((isGrounded == false && horizontalVelocity.magnitude > speed) || (desiredVelocity.magnitude < currentVelocityMagnitude && isCrouchWalking == false)) {
+				desiredVelocity = desiredVelocity.normalized * currentVelocityMagnitude;
+				Debug.Log("CLAMPY BOI");
+			}
+			
 			float dotProduct = Vector3.Dot(desiredVelocity.normalized, new Vector3(velocity.x, 0, velocity.z).normalized);
-			float acceleration = (isGrounded == true ? (inputMovement.magnitude < 0.125f ? 8f : 11f) : (inputMovement.magnitude < 0.125f ? 0f : 3.5f));
+			float acceleration = (isGrounded == true ? (inputMovement.magnitude < 0.1f ? 8f : 11f) : (inputMovement.magnitude < 0.1f ? 0f : 3.5f));
 
-			if (dotProduct < 0.05f || horizontalVelocity.magnitude < (speed * 0.75f)) {
-				velocity = Vector3.Lerp(velocity, new Vector3(desiredVelocity.x, velocity.y, desiredVelocity.z), Time.deltaTime * acceleration * (horizontalVelocity.magnitude > speed ? 0.125f : 1f));
+			if (dotProduct < 0.05f || isGrounded == true || horizontalVelocity.magnitude < speed * 0.75f) {
+				Debug.Log("LERP " + acceleration);
+				Vector3 velocityLerp = Vector3.Lerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
+				velocity = velocityLerp + new Vector3(0, velocity.y, 0);
 			} else {
+				Debug.Log("SLERP");
 				Vector3 velocitySlerp = Vector3.Slerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
 				velocity = velocitySlerp + new Vector3(0, velocity.y, 0);
 			}
@@ -161,16 +191,16 @@ public class Player : Entity {
 				Vector3 velocityPerpendicular = Quaternion.Euler(0, 90, 0) * velocityHorizontal.normalized;
 				bool strafingLeft = Vector3.Dot(velocityPerpendicular, inputDirection) > 0 ? false : true;
 				float strafeMultiplier = Mathf.Sqrt(Mathf.Clamp01((speedMax - velocityHorizontal.magnitude) / speedMax));   // Multiplier used for the acceleration being currently achieved through strafing (Lower the closer the player is to their max speed)
-				float strafeAcceleration = 0;
+				float strafeForce = 0;
 
 				if (strafingLeft == true) {
-					strafeAcceleration = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"), -1f, 0f)) * -6f * strafeMultiplier * Time.deltaTime;
+					strafeForce = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"), -1f, 0f)) * -1f * strafeMultiplier * accelerationStrafing * Time.deltaTime;
 				} else {
-					strafeAcceleration = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"),  0f, 1f)) *  6f * strafeMultiplier * Time.deltaTime;
+					strafeForce = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"),  0f, 1f)) *  1f * strafeMultiplier * accelerationStrafing * Time.deltaTime;
 				}
 
 				// Apply strafeAcceleration
-				velocity += velocityHorizontal.normalized * strafeAcceleration;
+				velocity += velocityHorizontal.normalized * (strafeForce * (isGrounded == true ? 17.5f : 1f));
 
 				// Clamp horizontalVelocity based on speedMax
 				velocity = Vector3.ClampMagnitude(new Vector3(velocity.x, 0, velocity.z), speedMax) + new Vector3(0, velocity.y, 0);
@@ -179,7 +209,9 @@ public class Player : Entity {
 			int horizontalVelocityMagnitude = (int)Mathf.Round(new Vector3(velocity.x, 0, velocity.z).magnitude);
 			if (horizontalVelocityMagnitude > personalHighscore) {
 				personalHighscore = horizontalVelocityMagnitude;
-				client.Send_Data_PersonalHighscore(personalHighscore);
+				if (client != null) {
+					client.Send_Data_PersonalHighscore(personalHighscore);
+				}
 			}
 
 			if (text_SpeedOMeter != null) {
@@ -189,7 +221,7 @@ public class Player : Entity {
 			}
 
 			// Apply Gravity
-			velocity += new Vector3(0, -22.5f * Time.deltaTime, 0);
+			velocity += new Vector3(0, -25f * Time.deltaTime, 0);
 
 			// Move Vertically
 			Vector3 deltaPosVertical = velocity * Time.deltaTime;
@@ -202,6 +234,25 @@ public class Player : Entity {
 			deltaPosHorizontal = Vector3.ProjectOnPlane(deltaPosHorizontal, groundNormal);
 			MovePlayerHorizontally(deltaPosHorizontal);
 
+			// Adjust wind volume
+			audioSource_Wind.volume = Mathf.Lerp(audioSource_Wind.volume, 0.025f * (Mathf.Sqrt(Mathf.Clamp(velocity.magnitude - (speed * 1.5f), 0, speedMax * 1.5f)) / Mathf.Sqrt(speedMax * 1.5f)), 7.5f * Time.deltaTime);
+
+			// Update Footsteps
+			float footstepDistance = 2.5f;
+			float speedVolumeMultiplier = new Vector3(velocity.x, 0, velocity.z).magnitude / speedMax;
+			float stepDistance = Vector3.Distance(transform.position, positionLastStepped);
+			float crouchingVolumeMultiplier = ((isCrouching == true || isSneaking == true || (head.localPosition.y < headHeightStanding * 0.5f)) && timeLastGrounded + 0.2f >= Time.time) ? 0.5f : 1.0f;
+
+			if (timeLastLanded + 0.3f < Time.time) {
+				if (isGrounded == true && stepDistance > (footstepDistance * (1f + (speedVolumeMultiplier * 2f)))) {
+					positionLastStepped = transform.position;
+					audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.55f, 0.85f), head);
+				} else if (isGrounded == true && speedVolumeMultiplier < 0.125f && stepDistance > 0.75f) {
+					positionLastStepped = transform.position;
+					audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.55f, 0.85f), head);
+				}
+			}
+
 			// Jumping
 			if (timeLastPressedJump + 0.1f >= Time.time) {
 				if (timeLastGrounded + 0.2f >= Time.time && timeLastJumped + 0.1f < Time.time) {
@@ -210,11 +261,53 @@ public class Player : Entity {
 					timeLastGrounded = -Mathf.Infinity;
 					timeLastJumped = Time.time;
 					timeLastPressedJump = -Mathf.Infinity;
-
-
-					velocity += Vector3.Slerp(Vector3.up, groundNormal, 0.5f) * 8f;
+					
+					velocity += Vector3.Slerp(Vector3.up, groundNormal, 0.5f) * 10f;
 				}
 			}
+
+			// Head Movement
+			float headHeightCurrent = (timeLastGrounded + 0.2f >= Time.time && isCrouching == true) ? headHeightCrouching : headHeightStanding;
+			headVelocityMultiplier = Mathf.Lerp(headVelocityMultiplier, 2.5f, 5f * Time.deltaTime);
+
+			head.transform.localPosition += headVelocity * Time.deltaTime * headVelocityMultiplier;
+			head.transform.localPosition = Vector3.ClampMagnitude(head.transform.localPosition - new Vector3(0, headHeightCurrent, 0), 1f) + new Vector3(0, headHeightCurrent, 0);
+			headVelocityDesired = Vector3.ClampMagnitude(new Vector3(0, headHeightCurrent, 0) - head.transform.localPosition, 0.5f) * 6.25f;
+			headVelocity = Vector3.Lerp(headVelocity, headVelocityDesired, 15f * headVelocityMultiplier * Time.deltaTime);
+
+			// Body Collider Resizing
+			float headHeightMultiplier = Mathf.Clamp01(head.transform.localPosition.y + 0.1f);
+			ResizeBodyCollider(headHeightMultiplier);
+		}
+	}
+
+	private void ResizeBodyCollider (float lerpValue) {
+		float newHeight = Mathf.Lerp(0.9f, 1.90f, lerpValue);
+		Vector3 newCenter = new Vector3(0, Mathf.Lerp(-0.45f, 0, lerpValue), 0);
+		
+		if (collider.height < newHeight) {      // If the body's height is growing larger
+			// Do a spherecast upwards to make sure the player's body isn't uncrouching into a ceiling
+			float radius = collider.radius;
+			float changeInHeight = newHeight - collider.height;
+
+			Vector3 origin = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f) + collider.center;
+			RaycastHit hit;
+
+			if (Physics.SphereCast(origin, radius, Vector3.up, out hit, changeInHeight + skinWidth, collisionMask)) {
+				float possibleChangeInHeight = hit.distance - skinWidth;
+
+				collider.height = Mathf.Clamp(collider.height + possibleChangeInHeight, 0.9f, 1.9f);
+				collider.center = new Vector3(0, Mathf.Clamp(collider.center.y + (possibleChangeInHeight / 2f), -0.45f, 0f), 0);
+
+				// Clamp head local position
+				head.transform.localPosition = new Vector3(0, Mathf.Lerp(headHeightCrouching, headHeightStanding, (collider.height - 0.9f)));
+			} else {
+				collider.height = newHeight;
+				collider.center = newCenter;
+			}
+		} else {
+			collider.height = newHeight;
+			collider.center = newCenter;
 		}
 	}
 
@@ -227,9 +320,11 @@ public class Player : Entity {
 		// Move the player with deltaPos until either we use up deltaPos magnitude OR we find a reason to break out of the loop
 		for (int i = 0; (i < 10 && deltaPos.magnitude > 0); i++) {
 			float sign = (deltaPos.y == 0 ? -1 : Mathf.Sign(deltaPos.y));
-			float radius = collider.radius - skinWidth;
-			Vector3 origin1 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f;
-			Vector3 origin2 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * -1f;
+			float radius = collider.radius;
+			//Vector3 origin1 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f;
+			//Vector3 origin2 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * -1f;
+			Vector3 origin1 = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) *  1f) + collider.center;
+			Vector3 origin2 = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * -1f) + collider.center;
 			RaycastHit hit;
 
 			//gizmoWizard.DrawSphere(origin1, Color.red, radius);
@@ -237,7 +332,7 @@ public class Player : Entity {
 
 			if (Physics.CapsuleCast(origin1, origin2, radius, deltaPos, out hit, deltaPos.magnitude + skinWidth, collisionMask)) {
 				// Move player based on hitDistance
-				Vector3 deltaPosCurrent = deltaPos.normalized * Mathf.Clamp(hit.distance - skinWidth, 0, Mathf.Infinity);
+				Vector3 deltaPosCurrent = deltaPos.normalized * (hit.distance - skinWidth);
 				transform.position += deltaPosCurrent;
 
 				// Extra steps for downward only velocity
@@ -246,12 +341,21 @@ public class Player : Entity {
 					
 					// Check if hit slope is above or below max slope
 					if (hitSlopeAngle <= slopeMax) {
+						if (isGrounded == false && velocity.y < -1.5f) {
+							StartCoroutine(PlayDelayedFootstepLanding(0.625f / Mathf.Clamp(Mathf.Abs(velocity.y), 2.5f, 25f)));
+						}
+
 						isGrounded = true;
+
 						timeLastGrounded = Time.time;
 						groundNormal = hit.normal;
 						if (hitSlopeAngle > slopeMax * 0.75f && Mathf.Abs(velocity.y) > 5f) {
 							velocity = Vector3.ProjectOnPlane(velocity, hit.normal);
 						} else {
+							if (velocity.y < -1f) {
+								headVelocity.y = velocity.y;
+							}
+
 							velocity.y = 0;
 						}
 						break;
@@ -290,14 +394,31 @@ public class Player : Entity {
 
 	}
 
+	private IEnumerator PlayDelayedFootstepLanding (float delay) {
+		timeLastLanded = Time.time;
+		headVelocityMultiplier = 1.0f;
+
+		float velocityDelayMultiplier = new Vector3(velocity.x, 0, velocity.z).magnitude / speedMax;
+
+		positionLastStepped = transform.position;
+		audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.25f + 0.25f * velocityDelayMultiplier), UnityEngine.Random.Range(0.75f, 0.85f), head);
+		
+		yield return new WaitForSeconds((delay - (delay * velocityDelayMultiplier * 0.95f)) * UnityEngine.Random.Range(0.95f, 1.05f));
+
+		if (isGrounded == true || timeLastJumped + 0.05f >= Time.time) {		// Only play second footstep if we're still grounded
+			positionLastStepped = transform.position;
+			audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
+		}
+	}
+
 	private void MovePlayerHorizontally (Vector3 deltaPos) {
 		// Moves the player horizontally via deltaPos
 		
 		// Move the player with deltaPos until either we use up deltaPos magnitude OR we find a reason to break out of the loop
 		for (int i = 0; (i < 10 && deltaPos.magnitude > 0); i++) {
-			float radius = collider.radius - skinWidth;
-			Vector3 origin1 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f;
-			Vector3 origin2 = transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * -1f;
+			float radius = collider.radius;
+			Vector3 origin1 = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f) + collider.center;
+			Vector3 origin2 = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * -1f) + collider.center;
 			RaycastHit hit;
 
 			//gizmoWizard.DrawSphere(origin1, Color.green, radius);
@@ -305,7 +426,7 @@ public class Player : Entity {
 
 			if (Physics.CapsuleCast(origin1, origin2, radius, deltaPos, out hit, deltaPos.magnitude + skinWidth, collisionMask)) {
 				// Move player based on hitDistance
-				Vector3 deltaPosCurrent = deltaPos.normalized * Mathf.Clamp(hit.distance - skinWidth, 0, Mathf.Infinity);
+				Vector3 deltaPosCurrent = deltaPos.normalized * (hit.distance - skinWidth);
 				transform.position += deltaPosCurrent;
 				deltaPos -= deltaPosCurrent;
 				deltaPos = Vector3.ProjectOnPlane(deltaPos, hit.normal);
@@ -330,7 +451,6 @@ public class Player : Entity {
 			StartCoroutine(FireWeapon(weaponCurrent));
 		}
 	}
-
 
 	private IEnumerator FireWeapon (Weapon weaponCurrent) {
 		//Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, camera.transform.position + camera.transform.forward, camera.transform.rotation).GetComponent<Projectile>();
