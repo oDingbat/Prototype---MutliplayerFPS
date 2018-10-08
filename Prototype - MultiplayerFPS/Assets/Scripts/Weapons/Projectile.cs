@@ -23,4 +23,5 @@ public class Projectile : Entity {
 	public override void UpdateEntity(string[] data) {
 		//
 	}
+
 }

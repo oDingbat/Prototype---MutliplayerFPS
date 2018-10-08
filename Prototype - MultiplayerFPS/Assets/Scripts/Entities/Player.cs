@@ -12,7 +12,6 @@ public class Player : Entity {
 	public int ownerClientId;
 
 	[Space(10)][Header("References")]
-	public AudioManager audioManager;
 	public Camera camera;                   // The camera attached to this player
 	public Transform head;
 	public CapsuleCollider collider;
@@ -38,6 +37,7 @@ public class Player : Entity {
 	bool isSneaking = false;
 	float timeLastGrounded = -Mathf.Infinity;
 	float timeLastJumped = -Mathf.Infinity;
+	float timeLastHeldJump = -Mathf.Infinity;
 	float timeLastPressedJump = -Mathf.Infinity;
 	float timeLastLanded;
 	float headHeightStanding = 0.9f;
@@ -61,12 +61,24 @@ public class Player : Entity {
 
 	[Space(10)][Header("Audio")]
 	public AudioClip clip_Footstep;
+	public AudioClip clip_Thud;
 	public AudioSource audioSource_Wind;
 
 	private void Start () {
-		uiManager = GameObject.Find("[UIManager]").GetComponent<UIManager>();
+		GetInitialReferences();
+	}
+
+	private void GetInitialReferences () {
 		head = transform.Find("[Camera] (Player)");
-		audioManager = GameObject.Find("[AudioManager]").GetComponent<AudioManager>();
+
+		// Client References
+		if (networkPerspective == NetworkPerspective.Client) {
+			uiManager = GameObject.Find("[UIManager]").GetComponent<UIManager>();
+
+			// Enable Client Camera & AudioListener
+			head.GetComponent<Camera>().enabled = true;
+			head.GetComponent<AudioListener>().enabled = true;
+		}
 	}
 
 	private void Update() {
@@ -107,7 +119,6 @@ public class Player : Entity {
 		// Updates player input
 
 		// Get movement input
-		
 		inputMovement = new Vector3(Input.GetAxis("Horizontal"), 0, Input.GetAxis("Vertical"));
 		if (inputMovement.magnitude > 1) {
 			inputMovement.Normalize();              // Normalize inputMovement if magnitude > 1
@@ -119,6 +130,7 @@ public class Player : Entity {
 			rotationDesired = new Vector3(Mathf.Clamp(rotationDesired.x - (Input.GetAxis("Mouse Y") * zoomMultiplier), -90f, 90f), rotationDesired.y + (Input.GetAxis("Mouse X") * zoomMultiplier), 0);
 		}
 
+		// Get Mouse Button Input
 		if (Input.GetMouseButtonDown(0)) {
 			Cursor.visible = false;
 			Cursor.lockState = CursorLockMode.None;
@@ -133,10 +145,14 @@ public class Player : Entity {
 		isSneaking = (Input.GetKey(KeyCode.LeftShift) && isCrouching == false);
 
 		UpdateWeapon();
-		
+
 		// Jumping
-		if (Input.GetKey(KeyCode.Space)) {
+		if (Input.GetKeyDown(KeyCode.Space)) {
 			timeLastPressedJump = Time.time;
+		}
+
+		if (Input.GetKey(KeyCode.Space)) {
+			timeLastHeldJump = Time.time;
 		}
 	}
 
@@ -166,18 +182,15 @@ public class Player : Entity {
 			float currentVelocityMagnitude = new Vector3(velocity.x, 0, velocity.z).magnitude;
 			if ((isGrounded == false && horizontalVelocity.magnitude > speed) || (desiredVelocity.magnitude < currentVelocityMagnitude && isCrouchWalking == false)) {
 				desiredVelocity = desiredVelocity.normalized * currentVelocityMagnitude;
-				Debug.Log("CLAMPY BOI");
 			}
 			
 			float dotProduct = Vector3.Dot(desiredVelocity.normalized, new Vector3(velocity.x, 0, velocity.z).normalized);
 			float acceleration = (isGrounded == true ? (inputMovement.magnitude < 0.1f ? 8f : 11f) : (inputMovement.magnitude < 0.1f ? 0f : 3.5f));
 
 			if (dotProduct < 0.05f || isGrounded == true || horizontalVelocity.magnitude < speed * 0.75f) {
-				Debug.Log("LERP " + acceleration);
 				Vector3 velocityLerp = Vector3.Lerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
 				velocity = velocityLerp + new Vector3(0, velocity.y, 0);
 			} else {
-				Debug.Log("SLERP");
 				Vector3 velocitySlerp = Vector3.Slerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
 				velocity = velocitySlerp + new Vector3(0, velocity.y, 0);
 			}
@@ -197,6 +210,10 @@ public class Player : Entity {
 					strafeForce = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"), -1f, 0f)) * -1f * strafeMultiplier * accelerationStrafing * Time.deltaTime;
 				} else {
 					strafeForce = Mathf.Sign(Mathf.Clamp(Input.GetAxis("Mouse X"),  0f, 1f)) *  1f * strafeMultiplier * accelerationStrafing * Time.deltaTime;
+				}
+				
+				if (isGrounded == true) {
+					strafeForce *= 1.5f;
 				}
 
 				// Apply strafeAcceleration
@@ -221,7 +238,7 @@ public class Player : Entity {
 			}
 
 			// Apply Gravity
-			velocity += new Vector3(0, -25f * Time.deltaTime, 0);
+			velocity += new Vector3(0, -27.5f * Time.deltaTime, 0);
 
 			// Move Vertically
 			Vector3 deltaPosVertical = velocity * Time.deltaTime;
@@ -246,23 +263,23 @@ public class Player : Entity {
 			if (timeLastLanded + 0.3f < Time.time) {
 				if (isGrounded == true && stepDistance > (footstepDistance * (1f + (speedVolumeMultiplier * 2f)))) {
 					positionLastStepped = transform.position;
-					audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.55f, 0.85f), head);
+					audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.70f, 0.85f), head);
 				} else if (isGrounded == true && speedVolumeMultiplier < 0.125f && stepDistance > 0.75f) {
 					positionLastStepped = transform.position;
-					audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.55f, 0.85f), head);
+					audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.1f + (0.15f * speedVolumeMultiplier)) * crouchingVolumeMultiplier, UnityEngine.Random.Range(0.70f, 0.85f), head);
 				}
 			}
 
 			// Jumping
-			if (timeLastPressedJump + 0.1f >= Time.time) {
+			if (timeLastHeldJump + 0.1f >= Time.time) {
 				if (timeLastGrounded + 0.2f >= Time.time && timeLastJumped + 0.1f < Time.time) {
 
 					isGrounded = false;
 					timeLastGrounded = -Mathf.Infinity;
 					timeLastJumped = Time.time;
-					timeLastPressedJump = -Mathf.Infinity;
+					timeLastHeldJump = -Mathf.Infinity;
 					
-					velocity += Vector3.Slerp(Vector3.up, groundNormal, 0.5f) * 10f;
+					velocity += Vector3.Slerp(Vector3.up, groundNormal, 0.5f) * 11f;
 				}
 			}
 
@@ -401,19 +418,22 @@ public class Player : Entity {
 		float velocityDelayMultiplier = new Vector3(velocity.x, 0, velocity.z).magnitude / speedMax;
 
 		positionLastStepped = transform.position;
-		audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.25f + 0.25f * velocityDelayMultiplier), UnityEngine.Random.Range(0.75f, 0.85f), head);
+		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.25f + 0.25f * velocityDelayMultiplier), UnityEngine.Random.Range(0.75f, 0.85f), head);
 		
 		yield return new WaitForSeconds((delay - (delay * velocityDelayMultiplier * 0.95f)) * UnityEngine.Random.Range(0.95f, 1.05f));
-
-		if (isGrounded == true || timeLastJumped + 0.05f >= Time.time) {		// Only play second footstep if we're still grounded
-			positionLastStepped = transform.position;
-			audioManager.PlayClipAtPoint(Vector3.zero, clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
-		}
+		
+		positionLastStepped = transform.position;
+		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
 	}
 
 	private void MovePlayerHorizontally (Vector3 deltaPos) {
 		// Moves the player horizontally via deltaPos
 		
+		// Make sure deltaPos isn't zero magnitude
+		if (deltaPos == Vector3.zero) {
+			return;
+		}
+
 		// Move the player with deltaPos until either we use up deltaPos magnitude OR we find a reason to break out of the loop
 		for (int i = 0; (i < 10 && deltaPos.magnitude > 0); i++) {
 			float radius = collider.radius;
@@ -472,7 +492,8 @@ public class Player : Entity {
 		float defaultFOV = 95f;
 		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
 	}
-
+	
+	#region Entity Methods
 	public override void InitializeEntity(string[] data) {
 		// Initializes the entity's values
 		// Player specific InitializeEntity structure: { entityId | entityType | ownerClientId | playerName | posX | poxY | poxZ }
@@ -490,7 +511,6 @@ public class Player : Entity {
 		// If this is our player, hide main menu camera and enable this player's camerea
 		if (networkPerspective == NetworkPerspective.Client) {
 			client.camera_MainMenu.gameObject.SetActive(false);
-			transform.Find("[Camera] (Player)").GetComponent<Camera>().enabled = true;          // Enable player camera
 			client.clientPlayer = this;
 		}
 
@@ -498,13 +518,11 @@ public class Player : Entity {
 		playerName = data[3];
 		transform.position = new Vector3(float.Parse(data[4]), float.Parse(data[5]), float.Parse(data[6]));
 	}
-
 	public override void UpdateEntity(string[] data) {
 		// Player specific UpdateEntity structure: { posX | poxY | poxZ | rotX | rotY }
 		positionDesired = new Vector3(float.Parse(data[0]), float.Parse(data[1]), float.Parse(data[2]));
 		rotationDesired = new Vector3(float.Parse(data[3]), float.Parse(data[4]), 0);
 	}
-
 	public override string GetEntityUpdateData () {
 		// Returns the data necessary to update this entity
 		// UpdateStructure : posX % posY % posZ % rotX % rotY
@@ -513,7 +531,6 @@ public class Player : Entity {
 
 		return newData;
 	}
-
 	public override string GetEntityInitializeData () {
 		// Returns the data necessary to initialize this entity
 
@@ -524,5 +541,5 @@ public class Player : Entity {
 
 		return newData;
 	}
-
+	#endregion
 }

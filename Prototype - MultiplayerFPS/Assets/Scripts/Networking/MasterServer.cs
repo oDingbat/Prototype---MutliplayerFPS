@@ -308,7 +308,7 @@ public class MasterServer : MonoBehaviour {
 			path = path.Replace("/MasterServer/MasterServer_Data", "");
 			path += "/GameServer/GameServer.x86_64";
 			
-			Process newProcess = Process.Start(path);
+			Process newProcess = Process.Start(path);						// TODO: Does this need to be a variable? Probs not.
 
 			timeLastAttemptedGameServerLaunch = Time.time;
 		}

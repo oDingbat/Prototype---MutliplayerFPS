@@ -53,7 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData:
     MAX_CONNECTION: 100
-    port: 6666
+    port: 6667
     hostId: 0
     connectionId: 0
     ipAddress: 127.0.0.1

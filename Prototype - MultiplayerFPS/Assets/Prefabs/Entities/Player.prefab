@@ -172,7 +172,7 @@ Camera:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1230231334266032}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 2
   m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
@@ -311,7 +311,7 @@ AudioListener:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1230231334266032}
-  m_Enabled: 1
+  m_Enabled: 0
 --- !u!82 &82061907422456196
 AudioSource:
   m_ObjectHideFlags: 1
@@ -419,8 +419,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   vitals:
-    healthCurrent: 0
-    healthMaximum: 0
+    healthCurrent: 50
+    healthMaximum: 100
     isDead: 0
     isInvulnerable: 0
   entityId: 0
@@ -470,6 +470,7 @@ MonoBehaviour:
   headVelocityDesired: {x: 0, y: 0, z: 0}
   headVelocityMultiplier: 0
   clip_Footstep: {fileID: 8300000, guid: a2ef5f39f4d42a04ea2c6e3b36e5455b, type: 3}
+  clip_Thud: {fileID: 8300000, guid: ceff4122d7438aa41b063ec0f0c536a8, type: 3}
   audioSource_Wind: {fileID: 82061907422456196}
 --- !u!114 &114600156627933056
 MonoBehaviour:

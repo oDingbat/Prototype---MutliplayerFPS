@@ -56,6 +56,7 @@ public class GameServer : MonoBehaviour {
 	private void Start() {
 		GetInitialReferences();
 		ConnectToMasterServer();
+		GetInitialEntities();
 		StartCoroutine(TickUpdate());
 	}
 	private void GetInitialReferences() {
@@ -108,6 +109,24 @@ public class GameServer : MonoBehaviour {
 
 		connectionData_GameServer.isConnected = true;
 		UnityEngine.Debug.Log("Server initialized successfully!");
+	}
+	private void GetInitialEntities () {
+		// Gets all initialEntities within the scene and adds them to entities dictionary
+		foreach (Transform t in container_Entities) {
+			if (t.GetComponent<Entity>()) {
+				Entity currentEntity = t.GetComponent<Entity>();
+
+				entities.Add(entityIteration, currentEntity);
+
+				// Set entity values
+				currentEntity.entityId = entityIteration;
+				currentEntity.gameServer = this;
+				currentEntity.networkPerspective = NetworkPerspective.Server;
+				currentEntity.GetEntityReferences();
+
+				entityIteration++;
+			}
+		}
 	}
 	#endregion
 
@@ -165,7 +184,6 @@ public class GameServer : MonoBehaviour {
 		NetworkEventType recData = NetworkEventType.Nothing;
 		do {        // Do While ensures that we process all of the sent messages each tick
 			recData = NetworkTransport.Receive(out recHostId, out connectionId, out channelId, recBuffer, recBuffer.Length, out dataSize, out error);
-			Debug.Log(recData);
 
 			switch (recData) {
 				case NetworkEventType.ConnectEvent:
@@ -249,7 +267,7 @@ public class GameServer : MonoBehaviour {
 			players.Remove(disconnectedPlayer);
 
 			// Destroy player's entity
-			Entity_Destroy(disconnectedPlayer.entityId);
+			DestroyEntity(disconnectedPlayer.entityId);
 
 			// Check if we need to set populationTimer
 			if (players.Count == 0) {
@@ -269,7 +287,7 @@ public class GameServer : MonoBehaviour {
 			ConnectedPlayer playerKicked = players.Single(p => p.connectionId == connectionId);
 
 			// Destroy player's entity
-			Entity_Destroy(playerKicked.entityId);
+			DestroyEntity(playerKicked.entityId);
 
 			// Remove player
 			players.Remove(playerKicked);
@@ -277,7 +295,12 @@ public class GameServer : MonoBehaviour {
 		
 		// TODO: Tell remaining players that a player was kicked
 	}
-	private void Entity_Destroy (int entityId) {
+	public void RemoveEntity(int entityId) {
+		if (entities.ContainsKey(entityId)) {
+			entities.Remove(entityId);
+		}
+	}
+	public void DestroyEntity (int entityId) {
 		// Destroys an entity and tells every connect client to do so aswell
 		if (entities.ContainsKey(entityId)) {       // Make sure this entity even exists
 			Destroy(entities[entityId].gameObject);
@@ -375,6 +398,7 @@ public class GameServer : MonoBehaviour {
 		cPlayer.entityId = entityIteration;
 		newPlayer.entityId = entityIteration;
 		entities.Add(entityIteration, newPlayer);
+		newPlayer.GetEntityReferences();
 
 		// Structure: { EntityId | EntityType | EntityData }
 		string entityData = entityIteration + "%" + newEntity.GetType().Name + "%" + connectionId + "%" + cPlayer.name + "%0%5%0";
@@ -396,6 +420,13 @@ public class GameServer : MonoBehaviour {
 		// Send message over reliableChannel to all clients connected
 		Send(newMessage, connectionData_GameServer.channelReliable, players);
 	}
+	public void Send_Data_EntityRPC (Entity entity, string rpcData) {
+		// Sends and RPC to clients, executing said RPC remotely on clients' specified entities
+
+		string newMessage = "Data_ExecuteRPC|" + entity.entityId + "|" + rpcData;
+
+		Send(newMessage, connectionData_GameServer.channelReliableSequenced, players);
+	}
 	private void Send_Data_InitializeAllEntities (int connectionId) {
 		// Sends data to client in order to initialize every entity in the server (Only called once when the player first connects)
 
@@ -407,7 +438,7 @@ public class GameServer : MonoBehaviour {
 		string newMessage = "Data_InitializeAllEntities|";
 
 		// Create a new list of enityDatas to send to the client
-		foreach (KeyValuePair<int, Entity> entityAndId in entities) {
+		foreach (KeyValuePair<int, Entity> entityAndId in entities) {			// 10/8/2018: Bro this is some sexy slick code not gonna lie
 			newMessage += entityAndId.Key + "%" + entityAndId.Value.GetType().Name + "%";
 			newMessage += entityAndId.Value.GetEntityInitializeData();
 			newMessage += "|";

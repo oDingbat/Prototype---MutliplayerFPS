@@ -51,6 +51,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 988a904a51cc46b4881061d799cfe1c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  networkPerspective: 2
   jukeboxCount: 32
   jukeboxIndex: 0
   jukeboxes: []

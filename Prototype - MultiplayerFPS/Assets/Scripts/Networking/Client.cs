@@ -29,6 +29,7 @@ public class Client : MonoBehaviour {
 	public GameObject panel_MainMenu;
 
 	[Space(10)][Header("Prefabs")]
+	public GameObject[] prefabPool_Pickups;
 	public GameObject prefab_Player;
 
 	public Dictionary<int, Entity> entities = new Dictionary<int, Entity>();
@@ -191,7 +192,7 @@ public class Client : MonoBehaviour {
 					break;
 
 				case "Data_UpdateEntity":
-					Receive_UpdateEntity(connectionId, splitData);
+					Receive_Data_UpdateEntity(connectionId, splitData);
 					break;
 
 				case "Data_EntityDestroy":
@@ -208,6 +209,10 @@ public class Client : MonoBehaviour {
 
 				case "Data_Highscore":
 					Receive_Data_Highscore(connectionId, splitData);
+					break;
+
+				case "Data_ExecuteRPC":
+					Receive_Data_ExecuteRPC(splitData);
 					break;
 			}
 		}
@@ -235,7 +240,7 @@ public class Client : MonoBehaviour {
 
 		Send_Data_PlayerDetails();
 	}
-	private void Receive_UpdateEntity (int connectionId, string[] splitData) {
+	private void Receive_Data_UpdateEntity (int connectionId, string[] splitData) {
 		// Updates an entity by passing splitData through it's UpdateEntity method
 		// UpdateEntity structure: { Data_UpdateEntity | EntityId | etc | etc | etc }
 
@@ -289,6 +294,26 @@ public class Client : MonoBehaviour {
 		string[] entityData = splitData[1].Split('%');
 		CreateEntity(entityData);
 	}
+	private void Receive_Data_ExecuteRPC (string[] splitData) {
+		// Sends rpcData to a specified Entity to call an RPC method (healing, picking up items, changing entity data, etc)
+
+		// RPC structure: { Data_ExecuteRPC | entityId | rpcData }
+
+		int entityId = int.Parse(splitData[1]);
+
+		// Extract rpcData
+		string[] rpcData = splitData[2].Split('%');
+		string rpcMethodName = rpcData[0];
+
+		// Get rpcMethodParams; set to null of there are none
+		string[] rpcMethodParams = null;
+		if (rpcData[1] != "null") {
+			rpcMethodParams = rpcData[1].Split('$');
+		}
+		
+		// Call specified entity's ExecuteRPC method
+		entities[entityId].ExecuteRPC(rpcMethodName, rpcMethodParams);
+	}
 	private void Receive_Error_IncorrectVersionNumber (int connectionId, string[] splitData) {
 		Debug.Log(splitData[0]);
 	}
@@ -305,35 +330,35 @@ public class Client : MonoBehaviour {
 				Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 				newEntity = newPlayer;
 				break;
+			case ("Pickup"):
+				int prefabPoolIndex = int.Parse(entityData[2]);
+				Pickup newPickup = Instantiate(prefabPool_Pickups[prefabPoolIndex], Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Pickup>();
+				newEntity = newPickup;
+				break;
 		}
 
+		newEntity.networkPerspective = NetworkPerspective.Client;
+		newEntity.GetEntityReferences();
 		newEntity.InitializeEntity(entityData);
 
 		// Add new entity to entities list
 		entities.Add(entityId, newEntity);
 	}
-	private void Receive_DataUpdateEntity (int connectionId, string[] splitData) {
-		// Updates an Entity based on splitData information
-
-		// Update Entity splitData format:		{ Data_UpdateEntity | EntityId | EntityData }
-		// EntityDate format:					{ Data1 % Data2 % Data3 % DataN... }
-
-		int entityId = int.Parse(splitData[1]);
-		string[] entityData = splitData[2].Split('%');
-
-		if (entities.Count > 0 && entities.ContainsKey(entityId)) {     // Make sure this entity exists
-			entities[entityId].UpdateEntity(entityData);				// UpdateEntity
-		} else {
-			UnityEngine.Debug.LogWarning("Warning: Entity not found!");
-		}
-	}
 	private void Receive_Data_EntityDestroy (int connectionId, string[] splitData) {
 		int entityId = int.Parse(splitData[1]);
 		
 		if (entities.ContainsKey(entityId)) {       // Make sure we have this entity
-			Destroy(entities[entityId].gameObject);
+			DestroyEntity(entityId);
+		}
+	}
+	public void RemoveEntity (int entityId) {
+		if (entities.ContainsKey(entityId)) {
 			entities.Remove(entityId);
 		}
+	}
+	public void DestroyEntity (int entityId) {
+		Destroy(entities[entityId].gameObject);
+		entities.Remove(entityId);
 	}
 	private void Receive_Data_Highscore (int connectionId, string[] splitData) {
 		string highscore = splitData[1];

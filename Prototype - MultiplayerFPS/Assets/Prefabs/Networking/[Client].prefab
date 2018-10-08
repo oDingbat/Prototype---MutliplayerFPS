@@ -53,10 +53,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData_MasterServer:
     MAX_CONNECTION: 100
-    port: 6666
+    port: 6667
     hostId: 0
     connectionId: 0
-    ipAddress: 104.248.114.134
+    ipAddress: 127.0.0.1
     error: 0
     tickRate: 64
     isConnected: 0
@@ -85,9 +85,12 @@ MonoBehaviour:
   ourClientId: 0
   container_Entities: {fileID: 0}
   container_Environemnt: {fileID: 0}
+  uiManager: {fileID: 0}
   text_Error: {fileID: 0}
   text_Name: {fileID: 0}
   text_Highscore: {fileID: 0}
   panel_MainMenu: {fileID: 0}
+  prefabPool_Pickups:
+  - {fileID: 1007795579360684, guid: 9c1acae80ca3a4c43baf792a733c2779, type: 2}
   prefab_Player: {fileID: 1633532524445638, guid: 9e983d22fe41a7543abba59b3166af59,
     type: 2}
