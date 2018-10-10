@@ -42,8 +42,8 @@ public class GameServer : MonoBehaviour {
 	[Space(10)][Header("Prefabs")]
 	public GameObject prefab_Player;
 
-	float timeReachedPopulationZero = 30;           // The time at which the GameServer reached a population of zero (starts at 30 to give the gameserver 30 seconds to get populated)
-	float populationZeroTimoutBuffer = 3f;			// The amount of time the GameServer will wait before it times out once the server pop reaches zero
+	float timeReachedPopulationZero = 60;           // The time at which the GameServer reached a population of zero (starts at 30 to give the gameserver 30 seconds to get populated)
+	float populationZeroTimoutBuffer = 60f;			// The amount of time the GameServer will wait before it times out once the server pop reaches zero
 
 	[Space(10)][Header("UI")]
 	public Text text_Debug_MasterServer;
@@ -230,6 +230,9 @@ public class GameServer : MonoBehaviour {
 				case "Data_PersonalHighscore":
 					Receive_Data_PersonalHighscore(connectionId, splitData);           // TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
 					break;
+				case "Data_ClientRPC":
+					Receive_Data_ClientRPC(connectionId, splitData);           // TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
+					break;
 			}
 		}
 	}
@@ -374,6 +377,36 @@ public class GameServer : MonoBehaviour {
 			}
 		}
 	}
+	private void Receive_Data_ClientRPC(int connectionId, string[] splitData) {
+		if (VerifySplitData(connectionId, splitData, 2)) {
+			if (splitData[1].Split('%').Length == 2) {      // Make sure splitData contains descriptor AND rpcData
+				Player connectionPlayer = players.Single(p => p.connectionId == connectionId).playerEntity;
+
+				// Extract rpcData
+				string[] rpcData = splitData[1].Split('%');
+				string rpcMethodName = rpcData[0];
+
+				// Verify that rpcDataParameters exists
+				if (rpcData[1].Length == 0) {
+					return;
+				}
+
+				// Get rpcMethodParams; set to null of there are none
+				string[] rpcMethodParams = null;
+				if (rpcData[1] != "null") {
+					rpcMethodParams = rpcData[1].Split('$');
+				}
+
+				// Call player's ExecuteClientRPC method, then pass on the rpc to other clients IF the rpc is successful
+				bool clientRPCSuccessful = connectionPlayer.ExecuteClientRPC(rpcMethodName, rpcMethodParams);
+
+				// If clientRPC was a success, relay this entityRPC over to ever client excluding the connectionId client
+				if (clientRPCSuccessful == true) {
+					Send_Data_RelayEntityRPC(connectionPlayer.entityId, splitData[1], players.Where(p => p.connectionId != connectionId).ToList());
+				}
+			}
+		}
+	}
 	#endregion
 
 	#region Send Methods
@@ -426,6 +459,13 @@ public class GameServer : MonoBehaviour {
 		string newMessage = "Data_ExecuteRPC|" + entity.entityId + "|" + rpcData;
 
 		Send(newMessage, connectionData_GameServer.channelReliableSequenced, players);
+	}
+	public void Send_Data_RelayEntityRPC(int entityId, string rpcData, List<ConnectedPlayer> specifiedPlayers) {
+		// Sends and RPC to clients, executing said RPC remotely on clients' specified entities
+
+		string newMessage = "Data_ExecuteRPC|" + entityId + "|" + rpcData;
+
+		Send(newMessage, connectionData_GameServer.channelReliableSequenced, specifiedPlayers);
 	}
 	private void Send_Data_InitializeAllEntities (int connectionId) {
 		// Sends data to client in order to initialize every entity in the server (Only called once when the player first connects)

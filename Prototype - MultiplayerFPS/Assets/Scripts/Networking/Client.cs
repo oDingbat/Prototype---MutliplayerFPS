@@ -337,10 +337,11 @@ public class Client : MonoBehaviour {
 				break;
 		}
 
+		newEntity.entityId = entityId;
 		newEntity.networkPerspective = NetworkPerspective.Client;
 		newEntity.GetEntityReferences();
 		newEntity.InitializeEntity(entityData);
-
+		
 		// Add new entity to entities list
 		entities.Add(entityId, newEntity);
 	}
@@ -412,6 +413,11 @@ public class Client : MonoBehaviour {
 		string clientData = "Data_ClientConnected|" + Version.GetVersionNumber();
 
 		SendToMasterServer(clientData, connectionData_MasterServer.channelReliable);
+	}
+	public void Send_Data_EntityClientRPC (string rpcData) {
+		string newMessage = "Data_ClientRPC|" + rpcData;
+
+		SendToGameServer(newMessage, connectionData_GameServer.channelReliableSequenced);
 	}
 	private void Send_Data_PlayerDetails () {
 		// Hide UI

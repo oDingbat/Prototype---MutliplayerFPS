@@ -92,5 +92,9 @@ MonoBehaviour:
   panel_MainMenu: {fileID: 0}
   prefabPool_Pickups:
   - {fileID: 1007795579360684, guid: 9c1acae80ca3a4c43baf792a733c2779, type: 2}
+  - {fileID: 1940222380347638, guid: b14e1c402278a364687bd9bba971779d, type: 2}
+  - {fileID: 1622265015208090, guid: 27c202cc17f2082468ae5a951c45d2b2, type: 2}
+  - {fileID: 1063526440404270, guid: 26053dae4bc1bf24cb3a46f104c5e4b4, type: 2}
+  - {fileID: 1612542748086348, guid: ce2a697023a5dfb45afb3cf56c454603, type: 2}
   prefab_Player: {fileID: 1633532524445638, guid: 9e983d22fe41a7543abba59b3166af59,
     type: 2}

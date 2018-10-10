@@ -2,26 +2,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Projectile : Entity {
+public class Projectile : MonoBehaviour {
 
-	public ProjectileAttributes projectileAttributes;
+	public Material material;
 
-	public override string GetEntityInitializeData() {
-		//
-		return null;
+	private void Start () {
+		material = transform.Find("(Model)").GetComponent<Renderer>().material;
 	}
 
-	public override string GetEntityUpdateData() {
-		//
-		return null;
-	}
-
-	public override void InitializeEntity(string[] data) {
-		//
-	}
-
-	public override void UpdateEntity(string[] data) {
-		//
+	private void Update () {
+		material.color = new Color(material.color.r, material.color.g, material.color.b, Mathf.Clamp01(material.color.a - (Time.deltaTime * 2.5f)));
+		if (material.color.a == 0) {
+			Destroy(gameObject);
+		}
 	}
 
 }

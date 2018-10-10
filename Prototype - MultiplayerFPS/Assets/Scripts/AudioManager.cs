@@ -38,8 +38,11 @@ public class AudioManager : MonoBehaviour {
 	public void PlayClipAtPoint(Vector3 localPosition, AudioClip clip, Transform parent) {
 		PlayClipAtPoint(localPosition, clip, 1f, 1f, parent);
 	}
+	public void PlayClipAtPoint(Vector3 localPosition, AudioClip clip, float volume, float pitch, Transform parent) {
+		PlayClipAtPoint(localPosition, clip, volume, pitch, 25, parent);
+	}
 
-	public void PlayClipAtPoint (Vector3 localPosition, AudioClip clip, float volume, float pitch, Transform parent) {
+	public void PlayClipAtPoint (Vector3 localPosition, AudioClip clip, float volume, float pitch, float maxDistance, Transform parent) {
 		// Make sure we have any jukeboxes
 		if (jukeboxes.Count == 0) {
 			Debug.LogError("Error: No jukeboxes found!");
@@ -61,6 +64,7 @@ public class AudioManager : MonoBehaviour {
 		jukeboxCurrent.clip = clip;
 		jukeboxCurrent.volume = volume;
 		jukeboxCurrent.pitch = pitch;
+		jukeboxCurrent.maxDistance = maxDistance;
 
 		// Play jukebox
 		jukeboxCurrent.Stop();

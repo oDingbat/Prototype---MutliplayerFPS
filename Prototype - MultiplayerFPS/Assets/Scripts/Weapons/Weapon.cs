@@ -10,9 +10,13 @@ public class Weapon {
 	[Space(10)][Header("Weapon Info")]
 	public string name;
 	public WeaponAttributes attributes;
+	public int damage;
 
 	[Space(10)][Header("Projectile Attributes")]
 	public ProjectileAttributes projectileAttributes;
+
+	[Space(10)][Header("Audio")]
+	public AudioClip clip_Fire;
 
 	[Space(10)][Header("Prefabs")]
 	public Transform prefab_Projectile;

@@ -19,7 +19,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4863360736772786}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: '[PersonalAudioSources]'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -37,7 +37,7 @@ GameObject:
   - component: {fileID: 20673727124996902}
   - component: {fileID: 81465132535553880}
   - component: {fileID: 114600156627933056}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: '[Camera] (Player)'
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
@@ -53,7 +53,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4475175007882900}
   - component: {fileID: 82061907422456196}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: '[Wind]'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -70,7 +70,7 @@ GameObject:
   - component: {fileID: 4406315207008438}
   - component: {fileID: 33987410091718092}
   - component: {fileID: 23810769818938512}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Cube
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -90,7 +90,7 @@ GameObject:
   - component: {fileID: 136732716935987800}
   - component: {fileID: 114226762070735638}
   - component: {fileID: 54490419967779360}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -282,7 +282,7 @@ MeshFilter:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1633532524445638}
-  m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: eaad70e51aa98864fbe4e2536b959230, type: 3}
 --- !u!33 &33987410091718092
 MeshFilter:
   m_ObjectHideFlags: 1
@@ -421,15 +421,22 @@ MonoBehaviour:
   vitals:
     healthCurrent: 50
     healthMaximum: 100
+    armorCurrent: 50
+    armorMaximum: 100
     isDead: 0
     isInvulnerable: 0
   entityId: 0
   networkPerspective: 0
   gameServer: {fileID: 0}
   client: {fileID: 0}
+  audioManager: {fileID: 0}
+  allowedClientRPCMethodNames:
+  - LaunchHitscanProjectile
   playerName: 
   ownerClientId: 0
-  audioManager: {fileID: 0}
+  projectileMask:
+    serializedVersion: 2
+    m_Bits: 3072
   camera: {fileID: 20673727124996902}
   head: {fileID: 0}
   collider: {fileID: 136732716935987800}
@@ -439,14 +446,16 @@ MonoBehaviour:
   weapons:
   - name: Rail Gun
     attributes:
-      firerate: 0
+      firerate: 10
       timeLastFired: 0
       zoomIncrement: 10
       zoomDecrement: 10
       zoomCurrent: 0
       zoomFOVMultiplier: 0.5
+    damage: 90
     projectileAttributes:
       muzzleVelocity: 0
+    clip_Fire: {fileID: 8300000, guid: 8afc02d3b3dee9048a25425087851387, type: 3}
     prefab_Projectile: {fileID: 0}
   weaponCurrentIndex: 0
   collisionMask:
@@ -469,8 +478,11 @@ MonoBehaviour:
   headVelocity: {x: 0, y: 0, z: 0}
   headVelocityDesired: {x: 0, y: 0, z: 0}
   headVelocityMultiplier: 0
+  prefab_ProjectileHitscan: {fileID: 1590739680899494, guid: 9e3827f6e8d79674881a661771531ff2,
+    type: 2}
   clip_Footstep: {fileID: 8300000, guid: a2ef5f39f4d42a04ea2c6e3b36e5455b, type: 3}
   clip_Thud: {fileID: 8300000, guid: ceff4122d7438aa41b063ec0f0c536a8, type: 3}
+  clip_Damage: {fileID: 8300000, guid: b4076d4f75bd02541870f1f12c13aded, type: 3}
   audioSource_Wind: {fileID: 82061907422456196}
 --- !u!114 &114600156627933056
 MonoBehaviour:
