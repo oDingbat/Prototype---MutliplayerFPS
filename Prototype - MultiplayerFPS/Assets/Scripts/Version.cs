@@ -5,7 +5,7 @@ using UnityEngine;
 public static class Version {
 
 	public static string GetVersionNumber () {
-		return "0.1.3";
+		return "0.2.4";
 	}
 
 }

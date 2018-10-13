@@ -18,12 +18,13 @@ public class GameServer : MonoBehaviour {
 	[Space(10)][Header("Container References")]
 	public Transform container_Entities;
 	public Transform container_Environemnt;
+
+	[Space(10)][Header("Gameplay Variables")]
+	public Transform[] respawnPoints;
+	public int respawnTime = 5;
 	
 	public Dictionary<int, Entity> entities = new Dictionary<int, Entity>();
 	public int entityIteration;
-
-	public int highscore;
-	public string highscoreName;
 
 	[System.Serializable]
 	public class ConnectedPlayer {
@@ -211,7 +212,7 @@ public class GameServer : MonoBehaviour {
 	}
 	private void ParseData(int connectionId, int channelId, byte[] recBuffer, int dataSize) {
 		string data = Encoding.Unicode.GetString(recBuffer, 0, dataSize);
-		Debug.Log("Recieving : " + data);
+		//Debug.Log("Recieving : " + data);
 		
 		string[] splitData = data.Split('|');
 
@@ -226,9 +227,6 @@ public class GameServer : MonoBehaviour {
 					break;
 				case "Data_GameServerPort":
 					Receive_Data_GameServerPort(connectionId, splitData);			// TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
-					break;
-				case "Data_PersonalHighscore":
-					Receive_Data_PersonalHighscore(connectionId, splitData);           // TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
 					break;
 				case "Data_ClientRPC":
 					Receive_Data_ClientRPC(connectionId, splitData);           // TODO: HEY UM VERIFY THIS IS MASTER SERVER... U NUTS?!?
@@ -256,7 +254,6 @@ public class GameServer : MonoBehaviour {
 
 		// Create a new player
 		players.Add(new ConnectedPlayer("N", connectionId));
-		Send_Data_Highscore();
 
 		string newMessage = "Data_GameServerInfo|" + connectionId;
 		Send(newMessage, connectionData_GameServer.channelReliable, connectionId);
@@ -298,11 +295,6 @@ public class GameServer : MonoBehaviour {
 		
 		// TODO: Tell remaining players that a player was kicked
 	}
-	public void RemoveEntity(int entityId) {
-		if (entities.ContainsKey(entityId)) {
-			entities.Remove(entityId);
-		}
-	}
 	public void DestroyEntity (int entityId) {
 		// Destroys an entity and tells every connect client to do so aswell
 		if (entities.ContainsKey(entityId)) {       // Make sure this entity even exists
@@ -313,6 +305,18 @@ public class GameServer : MonoBehaviour {
 
 			Send(newMessage, connectionData_GameServer.channelReliable, players);
 		}
+	}
+	#endregion
+
+	#region Gameplay Methods
+	public void Gameplay_PlayerDied (Player player) {
+		StartCoroutine(Gameplay_PlayerRespawning(player));
+	}
+	private IEnumerator Gameplay_PlayerRespawning (Player player) {
+		yield return new WaitForSeconds(respawnTime);
+
+		int respawnPointIndex = Random.Range(0, respawnPoints.Length);
+		player.Revive(100, 50, respawnPointIndex);
 	}
 	#endregion
 
@@ -365,31 +369,28 @@ public class GameServer : MonoBehaviour {
 		Debug.Log("Obtained port from MasterServer: " + connectionData_GameServer.port);
 		InitializeGameServer();
 	}
-	private void Receive_Data_PersonalHighscore (int connectionId, string[] splitData) {
-		if (VerifySplitData(connectionId, splitData, 2)) {
-			int newHighscore = int.Parse(splitData[1]);
-			players.Single(p => p.connectionId == connectionId).personalHighscore = newHighscore;
-
-			if (newHighscore > highscore) {
-				highscore = newHighscore;
-				highscoreName = players.Single(p => p.connectionId == connectionId).name;
-				Send_Data_Highscore();
-			}
-		}
-	}
 	private void Receive_Data_ClientRPC(int connectionId, string[] splitData) {
-		if (VerifySplitData(connectionId, splitData, 2)) {
-			if (splitData[1].Split('%').Length == 2) {      // Make sure splitData contains descriptor AND rpcData
-				Player connectionPlayer = players.Single(p => p.connectionId == connectionId).playerEntity;
+		if (VerifySplitData(connectionId, splitData, 3)) {
+			if (splitData[2].Split('%').Length == 2) {      // Make sure splitData contains descriptor AND rpcData
 
-				// Extract rpcData
-				string[] rpcData = splitData[1].Split('%');
-				string rpcMethodName = rpcData[0];
+				Debug.Log("CLIENT RPC RECEIVED: " + string.Join("|", splitData));
 
-				// Verify that rpcDataParameters exists
-				if (rpcData[1].Length == 0) {
+				// Extract entity data and rpcData
+				int entityId = int.Parse(splitData[1]);									// TODO: VERIFY!
+				string[] rpcData = splitData[2].Split('%');
+				
+				// Make sure there's actually an entity with the provided entityId AND rpcData has a method and params
+				if (entities.ContainsKey(entityId) == false || rpcData.Length < 2) {
+					Debug.LogError("Error: EntityId (" + entityId + ") not found. " + rpcData.Length);
 					return;
 				}
+
+				// Verify the client actually owns this entity (ie: their player Entity, projectile Entity, etc)
+				if (entities[entityId].ownerClientId != connectionId) {
+					return;
+				}
+
+				string rpcMethodName = rpcData[0];
 
 				// Get rpcMethodParams; set to null of there are none
 				string[] rpcMethodParams = null;
@@ -397,12 +398,12 @@ public class GameServer : MonoBehaviour {
 					rpcMethodParams = rpcData[1].Split('$');
 				}
 
-				// Call player's ExecuteClientRPC method, then pass on the rpc to other clients IF the rpc is successful
-				bool clientRPCSuccessful = connectionPlayer.ExecuteClientRPC(rpcMethodName, rpcMethodParams);
+				// Call entity's RPC method, then pass on the rpc to other clients IF the rpc is successful
+				bool clientRPCSuccessful = entities[entityId].ExecuteClientRPC(rpcMethodName, rpcMethodParams);
 
 				// If clientRPC was a success, relay this entityRPC over to ever client excluding the connectionId client
 				if (clientRPCSuccessful == true) {
-					Send_Data_RelayEntityRPC(connectionPlayer.entityId, splitData[1], players.Where(p => p.connectionId != connectionId).ToList());
+					Send_Data_RelayEntityRPC(entityId, splitData[2], players.Where(p => p.connectionId != connectionId).ToList());
 				}
 			}
 		}
@@ -496,10 +497,6 @@ public class GameServer : MonoBehaviour {
 		string gameServerData = "Data_GameServerConnected|" + Version.GetVersionNumber();
 
 		SendToMasterServer(gameServerData, connectionData_MasterServer.channelReliable);
-	}
-	private void Send_Data_Highscore () {
-		string msg = "Data_Highscore|" + (highscoreName + ": " + highscore);
-		Send(msg, connectionData_GameServer.channelReliable, players);
 	}
 	private void Send (string message, int channelId, ConnectedPlayer player) {
 		List<ConnectedPlayer> playersList = new List<ConnectedPlayer>();

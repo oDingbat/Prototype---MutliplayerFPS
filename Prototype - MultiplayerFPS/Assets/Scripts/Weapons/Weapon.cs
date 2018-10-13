@@ -5,12 +5,11 @@ using UnityEngine;
 [System.Serializable]
 public class Weapon {
 
-	// Weapon class, responsible for containing detailed information on how a weapon functions
+	// Weapon class, responsible for containing information on how a weapon functions
 
 	[Space(10)][Header("Weapon Info")]
 	public string name;
-	public WeaponAttributes attributes;
-	public int damage;
+	public WeaponAttributes weaponAttributes;
 
 	[Space(10)][Header("Projectile Attributes")]
 	public ProjectileAttributes projectileAttributes;

@@ -43,7 +43,7 @@ public class UIManager : MonoBehaviour {
 
 			// Set Cursor Info
 			Cursor.visible = true;
-			Cursor.lockState = CursorLockMode.Confined;
+			Cursor.lockState = CursorLockMode.None;
 		} else {
 			panel_MainMenu.SetActive(false);
 
@@ -67,7 +67,7 @@ public class UIManager : MonoBehaviour {
 
 			// Set Cursor Info
 			Cursor.visible = true;
-			Cursor.lockState = CursorLockMode.Confined;
+			Cursor.lockState = CursorLockMode.None;
 
 			panel_PauseMenu.SetActive(true);
 		}

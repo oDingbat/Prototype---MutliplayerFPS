@@ -9,8 +9,9 @@ public class Player : Entity {
 
 	[Space(10)][Header("Player Data")]
 	public string playerName;
-	public int ownerClientId;
-	public LayerMask projectileMask;
+
+	[Space(10)][Header("Layer Masks")]
+	public LayerMask collisionMask;
 
 	[Space(10)][Header("References")]
 	public Camera camera;                   // The camera attached to this player
@@ -19,20 +20,30 @@ public class Player : Entity {
 	public Rigidbody rigidbody;
 	public GizmoWizard gizmoWizard;
 	public UIManager uiManager;
+	public GameObject model;
 
 	[Space(10)][Header("Weapon Info")]
 	public List<Weapon> weapons;
 	public int weaponCurrentIndex;
 
 	[Space(10)][Header("Movement Settings")]
-	public LayerMask collisionMask;
 	public float slopeMax = 50;										// The maximum slope angle the player can climb
 	public float skinWidth = 0.001f;
 	public float speed = 14f;                                       // Maximum speed walking
 	public float speedCrouching = 6f;								// Maximum speed crouching
 	public float speedMax = 30f;                                    // Maximum possible spee
-	public float accelerationStrafing = 3f;							// The acceleration constant which is applied to the player's speed while strafing
-	
+	public float accelerationStrafing = 3f;                         // The acceleration constant which is applied to the player's speed while strafing
+
+	// Movement Private variables
+	public Vector3 velocity;
+	Vector3 inputMovement;                  // The input for the player's movement
+	Vector3 positionLastStepped;
+	Vector3 rotationDesired;
+	Vector3 rotationDesiredLerp;
+	Vector3 groundNormal;
+	Vector3 positionDesired;
+	Vector3 headVelocity;
+	Vector3 headVelocityDesired;
 	bool isGrounded = false;										// Is the player current on the ground?
 	bool isCrouching = false;
 	bool isSneaking = false;
@@ -41,30 +52,19 @@ public class Player : Entity {
 	float timeLastHeldJump = -Mathf.Infinity;
 	float timeLastPressedJump = -Mathf.Infinity;
 	float timeLastLanded;
+	float headVelocityMultiplier;
 	float headHeightStanding = 0.9f;
 	float headHeightCrouching = -0.1f;
 	
+	// Projectiles
+	public Dictionary<int, Projectile> projectiles = new Dictionary<int, Projectile>();
+	int projectileIdIncrement = 0;
+	
 	[Space(10)][Header("UI")]
 	public Text text_SpeedOMeter;
-	public int personalHighscore;
-
-	// Movement Variables
-	Vector3 inputMovement;                  // The input for the player's movement
-	public Vector3 positionLastStepped;
-	public Vector3 velocity;
-	public Vector3 rotationDesired;
-	public Vector3 rotationDesiredLerp;
-	public Vector3 groundNormal;
-	public Vector3 positionDesired;
-	public Vector3 headVelocity;
-	public Vector3 headVelocityDesired;
-	public float headVelocityMultiplier;
-
-	public GameObject prefab_ProjectileHitscan;
-
+	
 	[Space(10)][Header("Audio")]
 	public AudioClip clip_Footstep;
-	public AudioClip clip_Thud;
 	public AudioClip clip_Damage;
 	public AudioSource audioSource_Wind;
 
@@ -97,7 +97,8 @@ public class Player : Entity {
 	}
 
 	private void GetInitialReferences () {
-		head = transform.Find("[Camera] (Player)");
+		model = transform.Find("[Model]").gameObject;
+		head = model.transform.Find("[Camera] (Player)");
 
 		// Client References
 		if (networkPerspective == NetworkPerspective.Client) {
@@ -137,6 +138,11 @@ public class Player : Entity {
 	}
 
 	private void UpdateServer() {
+		// Checks
+		if (vitals.isDead == true) {
+			return;
+		}
+
 		rigidbody.velocity = Vector3.zero;
 		transform.position = positionDesired;
 		camera.transform.localEulerAngles = new Vector3(rotationDesired.x, 0, 0);       // Camera Up/Down rotation
@@ -160,14 +166,13 @@ public class Player : Entity {
 		
 		// Get rotation input
 		if (uiManager.isPaused == false) {
-			float zoomMultiplier = Mathf.Lerp(1f, (weapons[weaponCurrentIndex].attributes.zoomFOVMultiplier * 1f), weapons[weaponCurrentIndex].attributes.zoomCurrent * 0.5f);
+			float zoomMultiplier = Mathf.Lerp(1f, (weapons[weaponCurrentIndex].weaponAttributes.zoomFOVMultiplier * 1f), weapons[weaponCurrentIndex].weaponAttributes.zoomCurrent * 0.5f);
 			rotationDesired = new Vector3(Mathf.Clamp(rotationDesired.x - (Input.GetAxis("Mouse Y") * zoomMultiplier), -90f, 90f), rotationDesired.y + (Input.GetAxis("Mouse X") * zoomMultiplier), 0);
 		}
 
 		// Get Mouse Button Input
 		if (Input.GetMouseButtonDown(0)) {
 			Cursor.visible = false;
-			Cursor.lockState = CursorLockMode.None;
 			Cursor.lockState = CursorLockMode.Locked;
 			AttemptFireWeapon();
 		}
@@ -257,18 +262,11 @@ public class Player : Entity {
 				velocity = Vector3.ClampMagnitude(new Vector3(velocity.x, 0, velocity.z), speedMax) + new Vector3(0, velocity.y, 0);
 			}
 
-			int horizontalVelocityMagnitude = (int)Mathf.Round(new Vector3(velocity.x, 0, velocity.z).magnitude);
-			if (horizontalVelocityMagnitude > personalHighscore) {
-				personalHighscore = horizontalVelocityMagnitude;
-				if (client != null) {
-					client.Send_Data_PersonalHighscore(personalHighscore);
-				}
-			}
-
+			// Speed O Meter
 			if (text_SpeedOMeter != null) {
 				text_SpeedOMeter.text = Mathf.Round(velocityHorizontal.magnitude).ToString();
 			} else {
-				text_SpeedOMeter = GameObject.Find("Text_SpeedOMeter").GetComponent<Text>();
+				//text_SpeedOMeter = GameObject.Find("Text_SpeedOMeter").GetComponent<Text>();
 			}
 
 			// Apply Gravity
@@ -502,34 +500,95 @@ public class Player : Entity {
 	private void AttemptFireWeapon () {
 		// Attempt to fire weapon
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
-		if (weaponCurrent.attributes.timeLastFired + (1f / weaponCurrent.attributes.firerate) <= Time.time) {         // Firerate check
+		if (weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) {         // Firerate check
 			FireWeapon();
-			Debug.Log("YERP");
 		}
 	}
 
 	public void FireWeapon () {
-		Vector3 origin = head.transform.position + (head.transform.forward * 0.1f);
+		Vector3 origin = head.transform.position + (head.transform.forward * 0.1f) + new Vector3(0, -0.1f, 0);
 		Vector3 direction = head.transform.forward;
-		
-		RaycastHit hit;
-		bool hitHeadshot = false;
-		int hitEntityId = -1;
-		if (Physics.Raycast(origin, direction, out hit, Mathf.Infinity, projectileMask)) {
-			if (hit.transform.GetComponent<Entity>()) {
-				hitEntityId = hit.transform.GetComponent<Entity>().entityId;
 
-				if (hit.transform.tag == "Head") {
-					hitHeadshot = true;
-				}
-				
-			}
-		}
-
-		LaunchHitscanProjectile(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, hit.distance, hitEntityId, hitHeadshot);
+		SpawnProjectile(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z);
 	}
 
+	public bool SpawnProjectile (float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+		// Checks
+		if (vitals.isDead == true) {
+			return false;
+		}
+		
+		SendClientRPC("SpawnProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), dirX.ToString(), dirY.ToString(), dirZ.ToString() });
+
+		// Get Weapon/Projectile variables
+		Weapon weaponCurrent = weapons[weaponCurrentIndex];
+		Vector3 origin = new Vector3(originX, originY, originZ);
+		Vector3 direction = new Vector3(dirX, dirY, dirZ);
+
+		// Spawn projectile
+		Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
+		newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
+		projectiles.Add(projectileIdIncrement, newProjectile);
+		projectileIdIncrement++;                // Increment projectileIdIncrement
+
+		// Play Audio
+		if (networkPerspective != NetworkPerspective.Server) {
+			audioManager.PlayClipAtPoint(Vector3.forward * 0.25f, weaponCurrent.clip_Fire, 0.25f, 1.0f, 100, head);
+		}
+
+		return true;
+	}
+
+	public bool ProjectileDamage (int entityId, int projectileId, float directionX, float directionY, float directionZ) {
+		// Checks
+		if (vitals.isDead == true) {
+			return false;
+		}
+
+		SendClientRPC("ProjectileDamage", new string[] { entityId.ToString(), projectileId.ToString(), directionX.ToString(), directionY.ToString(), directionZ.ToString() });
+
+		if (projectiles.ContainsKey(projectileId)) {		// Make sure this projectile even exists
+			// If this isn't the Client's Player, destroy the projectile
+			if (networkPerspective != NetworkPerspective.Client) {
+				if (projectiles.ContainsKey(projectileId) == true) {
+					StartCoroutine(projectiles[projectileId].DestroyProjectile(true));
+				}
+			}
+
+			// If this is the GameServer, deal the damage to specified entity, and relay this projectileDamage to clients
+			Weapon weaponCurrent = weapons[weaponCurrentIndex];
+			Vector3 direction = new Vector3(directionX, directionY, directionZ).normalized;
+			Vector3 knockback = weaponCurrent.projectileAttributes.knockback * direction;
+			if (networkPerspective == NetworkPerspective.Server) {
+				if (gameServer.entities.ContainsKey(entityId)) {
+					gameServer.entities[entityId].Damage(weaponCurrent.projectileAttributes.damage, knockback.x, knockback.y, knockback.z);     // TODO: Maybe we should make sure projectile exists first and get damage straight from there?
+				}
+			}
+
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	private void UpdateWeapon() {
+		Weapon weaponCurrent = weapons[weaponCurrentIndex];
+		WeaponAttributes weaponAttributes = weaponCurrent.weaponAttributes;
+		if (Input.GetMouseButton(1)) {
+			// Zoom In
+			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
+		} else {
+			// Zoom Out
+			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
+		}
+
+		float defaultFOV = 95f;
+		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+	}
+
+	#region Vitals
 	public override void Damage(int damage, float knockbackX, float knockbackY, float knockbackZ) {
+		SendRPC("Damage", new string[] { damage.ToString(), knockbackX.ToString(), knockbackY.ToString(), knockbackZ.ToString() });
 		// Damages the entity
 		if (vitals.isDead == false && vitals.isInvulnerable == false) {                   // Only allow Damage if the entity is alive & is not invulnerable
 			int healthDmg = (int)Mathf.Ceil(damage * 0.25f);
@@ -551,67 +610,48 @@ public class Player : Entity {
 			}
 		}
 
-		if (networkPerspective == NetworkPerspective.Client) {
-			audioManager.PlayClipAtPoint(Vector3.zero, clip_Damage, 0.75f, 0.9f + Mathf.Lerp(Mathf.Clamp01(damage / 100f), 0f, 0.5f), head);
-		}
+		audioManager.PlayClipAtPoint(Vector3.zero, clip_Damage, 0.75f, 0.9f + Mathf.Lerp(Mathf.Clamp01(damage / 100f), 0f, 0.5f), head);
 
+		// Add knockback force
 		Vector3 knockbackForce = new Vector3(knockbackX, knockbackY, knockbackZ);
 		velocity += knockbackForce;
-
-		SendRPC("Damage", new string[] { damage.ToString(), knockbackX.ToString(), knockbackY.ToString(), knockbackZ.ToString() });
 	}
+	public override void Die() {
+		// Kills the entity, regardless of whether it is invulnerable or not
+		SendRPC("Die", null);
 
-	public bool LaunchHitscanProjectile (float originX, float originY, float originZ, float directionX, float directionY, float directionZ, float hitDistance, int hitEntityId, bool hitHeadshot) {
-		SendClientRPC("LaunchHitscanProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), directionX.ToString(), directionY.ToString(), directionZ.ToString(), hitDistance.ToString(), hitEntityId.ToString(), hitHeadshot.ToString() });
+		vitals.healthCurrent = 0;       // Set health to zero incase this method was called outside of this class
+		vitals.isDead = true;           // Set isDead to true
+		model.SetActive(false);
 
-		audioManager.PlayClipAtPoint(new Vector3(0, -0.25f, 0), weapons[weaponCurrentIndex].clip_Fire, 0.25f, 1f, 100f, head);
-
-		// Create HitscanProjectile
-		Vector3 origin = new Vector3(originX, originY, originZ) + new Vector3(0, -0.35f, 0);
-		Vector3 direction = new Vector3(directionX, directionY, directionZ).normalized;
-		RaycastHit hit;
-
-		Vector3 endPoint = origin + direction * 5000;
-
-		if (Physics.Raycast(origin, direction, out hit, collisionMask)) {
-			endPoint = hit.point;
+		// Tell the gameServer this player died so it can revive them when the time comes
+		if (networkPerspective == NetworkPerspective.Server) {
+			gameServer.Gameplay_PlayerDied(this);
 		}
-		
-		Vector3 midPoint = (origin + endPoint) / 2;
-
-		GameObject newHitscanProjectile = (GameObject)Instantiate(prefab_ProjectileHitscan, midPoint, Quaternion.LookRotation(direction, Vector3.up));
-		newHitscanProjectile.transform.localScale = new Vector3(1, 1, Vector3.Distance(origin, endPoint));
-		
-		// Do Damage to hitEntity
-		if (hitEntityId != -1) {
-			if (networkPerspective == NetworkPerspective.Client) {
-				audioManager.PlayClipAtPoint(Vector3.zero, clip_Damage, 0.75f, 0.9f + Mathf.Lerp(Mathf.Clamp01(weapons[weaponCurrentIndex].damage / 100f), 0f, 0.5f), 1000, client.entities[hitEntityId].transform);
-			} else if (networkPerspective == NetworkPerspective.Server) {
-				Vector3 knockbackForce = direction.normalized * 20f;
-				gameServer.entities[hitEntityId].Damage(weapons[weaponCurrentIndex].damage, knockbackForce.x, knockbackForce.y, knockbackForce.z);
-			}
-		}
-
-
-		
-		return true;
 	}
+	public override void Revive(int newHealth, int newArmor, int respawnPointIndex) {
+		// Revives the entity
+		SendRPC("Revive", new string[] { newHealth.ToString(), newArmor.ToString(), respawnPointIndex.ToString() });
 
-	private void UpdateWeapon () {
-		Weapon weaponCurrent = weapons[weaponCurrentIndex];
-		WeaponAttributes weaponAttributes = weaponCurrent.attributes;
-		if (Input.GetMouseButton(1)) {
-			// Zoom In
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
+		vitals.healthCurrent = newHealth;
+		vitals.armorCurrent = newArmor;
+		vitals.isDead = false;           // Set isDead to true
+
+		// Position player
+		Transform respawnPoint = null;
+		if (networkPerspective == NetworkPerspective.Server) {
+			respawnPoint = gameServer.respawnPoints[respawnPointIndex];
 		} else {
-			// Zoom Out
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
+			respawnPoint = client.respawnPoints[respawnPointIndex];
 		}
 
-		float defaultFOV = 95f;
-		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+		transform.position = respawnPoint.transform.position;
+		rotationDesired = new Vector3(respawnPoint.transform.localEulerAngles.x, respawnPoint.transform.localEulerAngles.y, 0);
+		camera.transform.localEulerAngles = new Vector3(rotationDesired.x, 0, 0);       // Camera Up/Down rotation
+		transform.localEulerAngles = new Vector3(0, rotationDesired.y, 0);              // Player Left/Right rotation
 	}
-	
+	#endregion
+
 	#region Entity Methods
 	public override void InitializeEntity(string[] data) {
 		// Initializes the entity's values

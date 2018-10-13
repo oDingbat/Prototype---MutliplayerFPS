@@ -53,7 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   connectionData_MasterServer:
     MAX_CONNECTION: 100
-    port: 6667
+    port: 6668
     hostId: 0
     connectionId: 0
     ipAddress: 127.0.0.1
@@ -82,10 +82,14 @@ MonoBehaviour:
   players: []
   container_Entities: {fileID: 0}
   container_Environemnt: {fileID: 0}
+  respawnPoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  respawnTime: 5
   entityIteration: 0
-  highscore: 0
-  highscoreName: 
-  prefab_Player: {fileID: 1633532524445638, guid: 9e983d22fe41a7543abba59b3166af59,
+  prefab_Player: {fileID: 1966871052328652, guid: 9e983d22fe41a7543abba59b3166af59,
     type: 2}
   text_Debug_MasterServer: {fileID: 0}
   text_Debug_Clients: {fileID: 0}

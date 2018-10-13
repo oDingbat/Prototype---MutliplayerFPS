@@ -12,6 +12,7 @@ public abstract class Entity : MonoBehaviour {
 
 	[Space(10)][Header("Networking Details")]
 	public int entityId;
+	public int ownerClientId;
 	public NetworkPerspective networkPerspective;
 	public GameServer gameServer;
 	public Client client;
@@ -47,6 +48,8 @@ public abstract class Entity : MonoBehaviour {
 	#region Vital Methods
 	public virtual void SetStack (int newHealth, int newArmor) {
 		// Sets the entity's health
+		SendRPC("SetStack", new string[] { newHealth.ToString(), newArmor.ToString() });
+
 		if (vitals.isDead == false && vitals.isInvulnerable == false) {                 // Only allow SetHealth if the entity is alive & is not invulnerable
 			vitals.healthCurrent = Mathf.Clamp(newHealth, 0, 999);     // Set the entity's health
 			vitals.armorCurrent = Mathf.Clamp(newArmor, 0, 999);		// Set the entity's health
@@ -55,10 +58,11 @@ public abstract class Entity : MonoBehaviour {
 				Die();
 			}
 		}
-		SendRPC("SetStack", new string[] { newHealth.ToString(), newArmor.ToString() });
 	}
 	public virtual void Damage (int damage, float knockbackX, float knockbackY, float knockbackZ) {
 		// Damages the entity
+		SendRPC("Damage", new string[] { damage.ToString(), knockbackX.ToString(), knockbackY.ToString(), knockbackZ.ToString() });
+
 		if (vitals.isDead == false && vitals.isInvulnerable == false) {                   // Only allow Damage if the entity is alive & is not invulnerable
 			int healthDmg = (int)Mathf.Ceil(damage * 0.25f);
 			int armorDmg = (int)Mathf.Floor(damage * 0.75f);
@@ -78,11 +82,11 @@ public abstract class Entity : MonoBehaviour {
 				Die();
 			}
 		}
-		
-		SendRPC("Damage", new string[] { damage.ToString(), knockbackX.ToString(), knockbackY.ToString(), knockbackZ.ToString() });
 	}
 	public virtual void HealHealth (int heal, int overhealPotential = 0) {
 		// Heals the entity's health
+		SendRPC("HealHealth", new string[] { heal.ToString(), overhealPotential.ToString() });
+
 		if (vitals.isDead == false && vitals.isInvulnerable == false) {                   // Only allow Heal if the entity is alive & is not invulnerable
 			vitals.healthCurrent = Mathf.Clamp(vitals.healthCurrent + heal, 0, vitals.healthMaximum + overhealPotential);     // Set the entity's health
 
@@ -90,23 +94,34 @@ public abstract class Entity : MonoBehaviour {
 				Die();
 			}
 		}
-		SendRPC("HealHealth", new string[] { heal.ToString() , overhealPotential.ToString() });
 	}
 	public virtual void HealArmor(int heal, int overarmorPotential = 0) {
 		// Heals the entity's armor
+		SendRPC("HealArmor", new string[] { heal.ToString(), overarmorPotential.ToString() });
+
 		if (vitals.isDead == false && vitals.isInvulnerable == false) {                   // Only allow Heal if the entity is alive & is not invulnerable
 			vitals.armorCurrent = Mathf.Clamp(vitals.armorCurrent + heal, 0, vitals.armorMaximum + overarmorPotential);     // Set the entity's health
 		}
-		SendRPC("HealArmor", new string[] { heal.ToString(), overarmorPotential.ToString() });
 	}
 	public virtual void Die () {
 		// Kills the entity, regardless of whether it is invulnerable or not
-		//vitals.healthCurrent = 0;       // Set health to zero incase this method was called outside of this class
-		//vitals.isDead = true;           // Set isDead to true
-	}
-	public virtual void Revive () {
-		// Revives the entity
+		SendRPC("Die", null);
 
+		vitals.healthCurrent = 0;       // Set health to zero incase this method was called outside of this class
+		vitals.isDead = true;           // Set isDead to true
+
+		// Tell the gameServer this player died so it can revive them when the time comes
+		if (networkPerspective == NetworkPerspective.Server) {
+			//gameServer.Gameplay_PlayerDied(this);
+		}
+	}
+	public virtual void Revive (int newHealth, int newArmor, int respawnPointIndex) {
+		// Revives the entity
+		SendRPC("Revive", new string[] { newHealth.ToString(), newArmor.ToString(), respawnPointIndex.ToString() });
+
+		vitals.healthCurrent = newHealth;
+		vitals.armorCurrent = newArmor;
+		vitals.isDead = false;           // Set isDead to true
 	}
 	#endregion
 
@@ -125,7 +140,7 @@ public abstract class Entity : MonoBehaviour {
 		bool successfulRPC = false;
 
 		if (allowedClientRPCMethodNames.Count == 0 || allowedClientRPCMethodNames.Contains(methodName) == false) {
-			Debug.LogError("Client RPC Error: Method not allowed/doesn't exist!");
+			Debug.LogError("Client RPC Error: Method not allowed/doesn't exist! Check your Entity's 'allowedClientRPCMethodNames'");
 			return false;
 		}
 
@@ -178,7 +193,7 @@ public abstract class Entity : MonoBehaviour {
 		method.Invoke(this, methodParamsParsed);
 	}
 	public void SendClientRPC (string methodName, string[] methodParams) {
-		// Sends an RPC call Client -> GameServer -> ServerPlayer.ExecuteRPC(data) -> (If Successful) -> GameServer -> AllClients(Excluding this Client)
+		// Sends an RPC call Client -> GameServer -> ServerPlayer.ExecuteClientRPC(data) -> (If Successful) -> GameServer -> AllClients(Excluding this Client)
 
 		// Make sure that this entity actually belongs to this client
 		if (networkPerspective != NetworkPerspective.Client) {
@@ -196,8 +211,8 @@ public abstract class Entity : MonoBehaviour {
 				rpcData += "null";
 			}
 
-			// Send RPC Data
-			client.Send_Data_EntityClientRPC(rpcData);
+			// Send Client RPC Data
+			client.Send_Data_EntityClientRPC(entityId, rpcData);
 		}
 	}
 	public void SendRPC(string methodName, string[] methodParams) {

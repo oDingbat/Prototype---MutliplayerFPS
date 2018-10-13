@@ -28,6 +28,9 @@ public class Client : MonoBehaviour {
 	public Text text_Highscore;
 	public GameObject panel_MainMenu;
 
+	[Space(10)][Header("Gameplay References")]
+	public Transform[] respawnPoints;
+
 	[Space(10)][Header("Prefabs")]
 	public GameObject[] prefabPool_Pickups;
 	public GameObject prefab_Player;
@@ -207,10 +210,6 @@ public class Client : MonoBehaviour {
 					Receive_Error_IncorrectVersionNumber(connectionId, splitData);
 					break;
 
-				case "Data_Highscore":
-					Receive_Data_Highscore(connectionId, splitData);
-					break;
-
 				case "Data_ExecuteRPC":
 					Receive_Data_ExecuteRPC(splitData);
 					break;
@@ -361,18 +360,9 @@ public class Client : MonoBehaviour {
 		Destroy(entities[entityId].gameObject);
 		entities.Remove(entityId);
 	}
-	private void Receive_Data_Highscore (int connectionId, string[] splitData) {
-		string highscore = splitData[1];
-		text_Highscore.text = highscore;
-	}
 	#endregion
 
 	#region Send Methods
-	public void Send_Data_PersonalHighscore (int personalHighscore) {
-		Debug.Log("SENDING");
-		string newMessage = "Data_PersonalHighscore|" + personalHighscore;
-		SendToGameServer(newMessage, connectionData_GameServer.channelReliable);
-	}
 	public void Send_Request_GameServerDetails () {
 		// Sends a request message to MasterServer, asking for a GameServer's details in order to join
 
@@ -414,8 +404,8 @@ public class Client : MonoBehaviour {
 
 		SendToMasterServer(clientData, connectionData_MasterServer.channelReliable);
 	}
-	public void Send_Data_EntityClientRPC (string rpcData) {
-		string newMessage = "Data_ClientRPC|" + rpcData;
+	public void Send_Data_EntityClientRPC (int entityId, string rpcData) {
+		string newMessage = "Data_ClientRPC|" + entityId + "|" + rpcData;
 
 		SendToGameServer(newMessage, connectionData_GameServer.channelReliableSequenced);
 	}

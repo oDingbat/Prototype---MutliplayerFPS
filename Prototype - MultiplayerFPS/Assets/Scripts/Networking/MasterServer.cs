@@ -305,9 +305,14 @@ public class MasterServer : MonoBehaviour {
 		if (timeLastAttemptedGameServerLaunch + 5f < Time.time) {
 
 			string path = Application.dataPath;
-			path = path.Replace("/MasterServer/MasterServer_Data", "");
-			path += "/GameServer/GameServer.x86_64";
-			
+			path = path.Replace("/MasterServer/Prototype - MultiplayerFPS_Data", "");
+
+			if (Application.platform == RuntimePlatform.WindowsPlayer) {
+				path += "/GameServer/Prototype - MultiplayerFPS.exe";
+			} else {
+				path += "/GameServer/GameServer.x86_64";
+			}
+
 			Process newProcess = Process.Start(path);						// TODO: Does this need to be a variable? Probs not.
 
 			timeLastAttemptedGameServerLaunch = Time.time;
