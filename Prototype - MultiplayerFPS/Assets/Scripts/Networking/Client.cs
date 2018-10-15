@@ -329,7 +329,7 @@ public class Client : MonoBehaviour {
 				Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 				newEntity = newPlayer;
 				break;
-			case ("Pickup"):
+			case ("AmmoPickup"): case ("StackPickup"):
 				int prefabPoolIndex = int.Parse(entityData[2]);
 				Pickup newPickup = Instantiate(prefabPool_Pickups[prefabPoolIndex], Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Pickup>();
 				newEntity = newPickup;

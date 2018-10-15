@@ -231,17 +231,24 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 3072
   networkPerspective: 2
+  parentPlayer: {fileID: 0}
   projectileCollider: {fileID: 0}
   trailRenderer: {fileID: 0}
   model: {fileID: 0}
-  projectileId: 0
   projectileAttributes:
     damage: 0
-    knockback: {x: 0, y: 0, z: 0}
+    knockback: NaN
     muzzleVelocity: 0
+    ricochetCount: 0
+    ricochetMaxAngle: 0
+    gravityScale: 0
+    bouncinessMin: 0
+    bouncinessMax: 0
+    entityPenetration: 0
     projectileRadius: 0
+    trailRendererTime: 0
     lifespan: 0
-  leftoverDeltaP: 0
+  projectileId: 0
 --- !u!135 &135261797531896488
 SphereCollider:
   m_ObjectHideFlags: 1

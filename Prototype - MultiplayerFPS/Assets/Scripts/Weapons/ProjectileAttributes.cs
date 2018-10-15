@@ -16,6 +16,7 @@ public class ProjectileAttributes {
 	public float gravityScale;          // The amount of gravity applied to this projectile per second (1 = -9.81 units/second)
 	public float bouncinessMin;         // The bounciness coefficient; defines how much velocity the projectile retains after each bounce
 	public float bouncinessMax;         // The bounciness coefficient; defines how much velocity the projectile retains after each bounce
+	public bool entityPenetration;		// Can this projectile penetrate through an entity?
 
 	[Space(10)][Header("Other Attributes")]
 	public float projectileRadius;      // The radius of the projectile
@@ -31,6 +32,7 @@ public class ProjectileAttributes {
 		gravityScale = copiedProjectileAttributes.gravityScale;
 		bouncinessMin = copiedProjectileAttributes.bouncinessMin;
 		bouncinessMax = copiedProjectileAttributes.bouncinessMax;
+		entityPenetration = copiedProjectileAttributes.entityPenetration;
 		projectileRadius = copiedProjectileAttributes.projectileRadius;
 		trailRendererTime = copiedProjectileAttributes.trailRendererTime;
 		lifespan = copiedProjectileAttributes.lifespan;

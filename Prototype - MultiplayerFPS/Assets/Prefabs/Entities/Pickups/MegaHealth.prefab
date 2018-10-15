@@ -37,7 +37,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4861294908895652}
   - component: {fileID: 135028278548417008}
-  - component: {fileID: 114159413787943460}
+  - component: {fileID: 114674672636179292}
   m_Layer: 13
   m_Name: MegaHealth
   m_TagString: Untagged
@@ -114,7 +114,7 @@ MeshFilter:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1208528631493730}
   m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
---- !u!114 &114159413787943460
+--- !u!114 &114674672636179292
 MonoBehaviour:
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
@@ -122,7 +122,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1940222380347638}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3bf6819dd3ff12d41a7f8f7160f8bdcc, type: 3}
+  m_Script: {fileID: 11500000, guid: 76844a718834c394ebc2ed09068f54c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   vitals:
@@ -133,22 +133,24 @@ MonoBehaviour:
     isDead: 0
     isInvulnerable: 0
   entityId: 0
+  ownerClientId: 0
   networkPerspective: 0
   gameServer: {fileID: 0}
   client: {fileID: 0}
   audioManager: {fileID: 0}
+  allowedClientRPCMethodNames: []
   pickupModel: {fileID: 1208528631493730}
+  lifespan: 0
+  respawnTime: 15
+  destroyOnPickup: 0
+  prefabPoolIndex: 5
+  isRespawning: 0
+  clip_Pickup: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
+  clip_Respawn: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
   health: 100
   armor: 0
   overhealPotential: 75
   overarmorPotential: 0
-  lifespan: 0
-  respawnTime: 15
-  destroyOnPickup: 0
-  prefabPoolIndex: 1
-  isRespawning: 0
-  clip_Pickup: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
-  clip_Respawn: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
 --- !u!135 &135028278548417008
 SphereCollider:
   m_ObjectHideFlags: 1

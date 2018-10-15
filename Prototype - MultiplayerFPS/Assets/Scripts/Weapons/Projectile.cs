@@ -19,6 +19,8 @@ public class Projectile : MonoBehaviour {
 	[Space(10)][Header("Attributes")]
 	public ProjectileAttributes projectileAttributes;
 	public int projectileId;
+	
+	List<Entity> damagedEntities = new List<Entity>();
 
 	// Constants
 	float skinWidth = 0.05f;
@@ -34,6 +36,9 @@ public class Projectile : MonoBehaviour {
 		projectileCollider = GetComponent<SphereCollider>();
 		model = transform.Find("(Model)");
 		trailRenderer = model.GetComponent<TrailRenderer>();
+
+		// Add parentPlayer to damagedEntities as to ignore it on collision
+		damagedEntities.Add(player);
 
 		// Set Attributes
 		projectileId = newProjectileId;
@@ -75,10 +80,24 @@ public class Projectile : MonoBehaviour {
 			// Player Damage
 			if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Players")) {
 				if (hit.transform.GetComponent<Entity>()) {
-					Debug.Log("Damage Entity");
 					Entity hitEntity = hit.transform.GetComponent<Entity>();
-					parentPlayer.ProjectileDamage(hitEntity.entityId, projectileId, velocity.x, velocity.y, velocity.z);
-					StartCoroutine(DestroyProjectile(false));
+					
+					if (projectileAttributes.entityPenetration == false) {
+						// Damage entity and destroy projectile
+						parentPlayer.ProjectileDamage(hitEntity.entityId, projectileId, velocity.x, velocity.y, velocity.z);
+						StartCoroutine(DestroyProjectile(false));
+					} else {
+						// If we haven't already damaged this entity, damage it, and then pass through it; otherwise just pass through it
+						if (damagedEntities.Contains(hitEntity) == false) {
+							// Damage the entity and add it to damagedEntities list
+							parentPlayer.ProjectileDamage(hitEntity.entityId, projectileId, velocity.x, velocity.y, velocity.z);
+							damagedEntities.Add(hitEntity);
+							transform.position += (velocity.normalized * (hit.distance + 0.05f));
+						} else {
+							transform.position += (velocity.normalized * (hit.distance + 0.05f));
+						}
+					}
+
 					return;
 				}
 			}

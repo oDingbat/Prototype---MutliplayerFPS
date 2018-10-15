@@ -34,6 +34,11 @@ public class Player : Entity {
 	public float speedMax = 30f;                                    // Maximum possible spee
 	public float accelerationStrafing = 3f;                         // The acceleration constant which is applied to the player's speed while strafing
 
+	// Other Constants
+	float timeLastHeldFire;					// The time at which the player last held the FIRE button
+	float timeLastPressedFire;              // The time at which the player last pressed the FIRE button
+	float weaponFireForgiveness = 0.125f;	// The button press forgiveness for firing a weapon
+
 	// Movement Private variables
 	public Vector3 velocity;
 	Vector3 inputMovement;                  // The input for the player's movement
@@ -174,6 +179,15 @@ public class Player : Entity {
 		if (Input.GetMouseButtonDown(0)) {
 			Cursor.visible = false;
 			Cursor.lockState = CursorLockMode.Locked;
+			timeLastPressedFire = Time.time;
+		}
+
+		if (Input.GetMouseButton(0)) {
+			timeLastHeldFire = Time.time;
+		}
+
+		// Attemp firing
+		if (timeLastPressedFire + weaponFireForgiveness >= Time.time || (weapons[weaponCurrentIndex].weaponAttributes.automatic && timeLastHeldFire >= Time.time)) {
 			AttemptFireWeapon();
 		}
 		
@@ -224,13 +238,13 @@ public class Player : Entity {
 			}
 			
 			float dotProduct = Vector3.Dot(desiredVelocity.normalized, new Vector3(velocity.x, 0, velocity.z).normalized);
-			float acceleration = (isGrounded == true ? (inputMovement.magnitude < 0.1f ? 8f : 11f) : (inputMovement.magnitude < 0.1f ? 0f : 3.5f));
+			float acceleration = (isGrounded == true ? (inputMovement.magnitude < 0.1f ? 8f : 9f) : (inputMovement.magnitude < 0.1f ? 0f : 2.25f));
 
 			if (dotProduct < 0.05f || isGrounded == true || horizontalVelocity.magnitude < speed * 0.75f) {
 				Vector3 velocityLerp = Vector3.Lerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
 				velocity = velocityLerp + new Vector3(0, velocity.y, 0);
 			} else {
-				Vector3 velocitySlerp = Vector3.Slerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration);
+				Vector3 velocitySlerp = Vector3.Slerp(horizontalVelocity, desiredVelocity, Time.deltaTime * acceleration * 1.25f);
 				velocity = velocitySlerp + new Vector3(0, velocity.y, 0);
 			}
 
@@ -315,6 +329,21 @@ public class Player : Entity {
 				}
 			}
 
+			// Wall Jumping
+			if (isGrounded == false && timeLastJumped + 0.1f < Time.time) {
+				if (timeLastPressedJump + 0.1 >= Time.time) {
+					// Try to get nearby wall info
+					Vector3 wallNormal = GetWallInfo();
+
+					if (wallNormal != Vector3.zero) {
+						timeLastJumped = Time.time;
+						StartCoroutine(PlayDelayedFootstepLanding(0.625f / Mathf.Clamp(Mathf.Abs(velocity.y), 2.5f, 25f)));
+						velocity = Vector3.Slerp(velocity, wallNormal.normalized * velocity.magnitude, 0.5f);
+						velocity += Vector3.Slerp(new Vector3(0, 11f, 0), wallNormal.normalized * 9f, 0.375f);
+					}
+				}
+			}
+
 			// Head Movement
 			float headHeightCurrent = (timeLastGrounded + 0.25f >= Time.time && isCrouching == true) ? headHeightCrouching : headHeightStanding;
 			headVelocityMultiplier = Mathf.Lerp(headVelocityMultiplier, 2.5f, 5f * Time.deltaTime);
@@ -358,6 +387,32 @@ public class Player : Entity {
 			collider.height = newHeight;
 			collider.center = newCenter;
 		}
+	}
+
+	private Vector3 GetWallInfo () {
+		// Gets info about nearby walls; important for performing walljumps
+		
+		// Variables
+		Vector3 wallNormal = Vector3.zero;
+		float closestWallDistance = Mathf.Infinity;
+
+		// Constants
+		int raycastCount = 8;
+		float walljumpReach = 0.3f;
+		float iterationAngle = 360f / (float)raycastCount;
+
+		for (int i = 0; i < raycastCount; i++) {
+			RaycastHit hit;
+			if (Physics.SphereCast(transform.position, collider.radius - skinWidth, Quaternion.Euler(0, i * iterationAngle, 0) * Vector3.forward, out hit, walljumpReach + skinWidth, collisionMask)) {
+				// Is this the closest hit so far?
+				if (hit.distance < closestWallDistance) {
+					closestWallDistance = hit.distance;
+					wallNormal = hit.normal;
+				}
+			}
+		}
+
+		return wallNormal;
 	}
 
 	private void MovePlayerVertically (Vector3 deltaPos) {
@@ -501,6 +556,7 @@ public class Player : Entity {
 		// Attempt to fire weapon
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 		if (weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) {         // Firerate check
+			timeLastPressedFire = -Mathf.Infinity;
 			FireWeapon();
 		}
 	}
@@ -517,26 +573,36 @@ public class Player : Entity {
 		if (vitals.isDead == true) {
 			return false;
 		}
-		
-		SendClientRPC("SpawnProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), dirX.ToString(), dirY.ToString(), dirZ.ToString() });
 
-		// Get Weapon/Projectile variables
+		// Get current weapon
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
-		Vector3 origin = new Vector3(originX, originY, originZ);
-		Vector3 direction = new Vector3(dirX, dirY, dirZ);
 
-		// Spawn projectile
-		Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
-		newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
-		projectiles.Add(projectileIdIncrement, newProjectile);
-		projectileIdIncrement++;                // Increment projectileIdIncrement
+		if (weaponCurrent.weaponAttributes.ammoCurrent >= weaponCurrent.weaponAttributes.consumption) {
+			// Adjust weaponAttributes
+			weaponCurrent.weaponAttributes.ammoCurrent -= weaponCurrent.weaponAttributes.consumption;
+			weaponCurrent.weaponAttributes.timeLastFired = Time.time;
 
-		// Play Audio
-		if (networkPerspective != NetworkPerspective.Server) {
-			audioManager.PlayClipAtPoint(Vector3.forward * 0.25f, weaponCurrent.clip_Fire, 0.25f, 1.0f, 100, head);
+			SendClientRPC("SpawnProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), dirX.ToString(), dirY.ToString(), dirZ.ToString() });
+
+			// Get Weapon/Projectile variables
+			Vector3 origin = new Vector3(originX, originY, originZ);
+			Vector3 direction = new Vector3(dirX, dirY, dirZ);
+
+			// Spawn projectile
+			Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
+			newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
+			projectiles.Add(projectileIdIncrement, newProjectile);
+			projectileIdIncrement++;                // Increment projectileIdIncrement
+
+			// Play Audio
+			if (networkPerspective != NetworkPerspective.Server) {
+				audioManager.PlayClipAtPoint(Vector3.forward * 0.25f, weaponCurrent.clip_Fire, 0.25f, 1.0f, 100, head);
+			}
+
+			return true;
+		} else {
+			return false;
 		}
-
-		return true;
 	}
 
 	public bool ProjectileDamage (int entityId, int projectileId, float directionX, float directionY, float directionZ) {
@@ -550,7 +616,7 @@ public class Player : Entity {
 		if (projectiles.ContainsKey(projectileId)) {		// Make sure this projectile even exists
 			// If this isn't the Client's Player, destroy the projectile
 			if (networkPerspective != NetworkPerspective.Client) {
-				if (projectiles.ContainsKey(projectileId) == true) {
+				if (projectiles.ContainsKey(projectileId) == true && projectiles[projectileId].projectileAttributes.entityPenetration == false) {
 					StartCoroutine(projectiles[projectileId].DestroyProjectile(true));
 				}
 			}
@@ -584,6 +650,12 @@ public class Player : Entity {
 
 		float defaultFOV = 95f;
 		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+	}
+
+	public void PickupAmmo (int weaponIndex, int ammoAmount) {
+		SendRPC("PickupAmmo", new string[] { weaponIndex.ToString(), ammoAmount.ToString() } );
+
+		weapons[weaponIndex].weaponAttributes.ammoCurrent = Mathf.Clamp(weapons[weaponIndex].weaponAttributes.ammoCurrent + ammoAmount, 0, weapons[weaponIndex].weaponAttributes.ammoMax);
 	}
 
 	#region Vitals

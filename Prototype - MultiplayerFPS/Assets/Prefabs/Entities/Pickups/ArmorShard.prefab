@@ -36,8 +36,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4028663975156878}
-  - component: {fileID: 114433304740021760}
   - component: {fileID: 65199816633504608}
+  - component: {fileID: 114908442175849520}
   m_Layer: 13
   m_Name: ArmorShard
   m_TagString: Untagged
@@ -126,7 +126,7 @@ BoxCollider:
   serializedVersion: 2
   m_Size: {x: 0.5, y: 1, z: 0.5}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &114433304740021760
+--- !u!114 &114908442175849520
 MonoBehaviour:
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
@@ -134,7 +134,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1612542748086348}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3bf6819dd3ff12d41a7f8f7160f8bdcc, type: 3}
+  m_Script: {fileID: 11500000, guid: 76844a718834c394ebc2ed09068f54c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   vitals:
@@ -145,19 +145,21 @@ MonoBehaviour:
     isDead: 0
     isInvulnerable: 0
   entityId: 0
+  ownerClientId: 0
   networkPerspective: 0
   gameServer: {fileID: 0}
   client: {fileID: 0}
   audioManager: {fileID: 0}
+  allowedClientRPCMethodNames: []
   pickupModel: {fileID: 1169717197140972}
-  health: 0
-  armor: 10
-  overhealPotential: 0
-  overarmorPotential: 75
   lifespan: 0
   respawnTime: 15
   destroyOnPickup: 0
-  prefabPoolIndex: 4
+  prefabPoolIndex: 1
   isRespawning: 0
   clip_Pickup: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
   clip_Respawn: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
+  health: 0
+  armor: 10
+  overhealPotential: 0
+  overarmorPotential: 10

@@ -343,7 +343,7 @@ Camera:
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 60695
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -977,6 +977,11 @@ MonoBehaviour:
   weapons:
   - name: Rail Gun
     weaponAttributes:
+      ammoCurrent: 453
+      ammoMax: 16
+      ammoType: Default
+      consumption: 1
+      automatic: 1
       firerate: 10
       timeLastFired: 0
       zoomIncrement: 10
@@ -984,17 +989,18 @@ MonoBehaviour:
       zoomCurrent: 0
       zoomFOVMultiplier: 0.5
     projectileAttributes:
-      damage: 25
+      damage: 100
       knockback: 5
-      muzzleVelocity: 1000
-      ricochetCount: 100
-      ricochetMaxAngle: 180
+      muzzleVelocity: 250
+      ricochetCount: 3
+      ricochetMaxAngle: 45
       gravityScale: 1
       bouncinessMin: 1
       bouncinessMax: 1
+      entityPenetration: 1
       projectileRadius: 0.1
-      trailRendererTime: 0.1
-      lifespan: 5
+      trailRendererTime: 0.05
+      lifespan: 2
     clip_Fire: {fileID: 8300000, guid: 8afc02d3b3dee9048a25425087851387, type: 3}
     prefab_Projectile: {fileID: 4285405437014306, guid: 9e3827f6e8d79674881a661771531ff2,
       type: 2}

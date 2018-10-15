@@ -21,12 +21,14 @@ public class HUDController : MonoBehaviour {
 		if (GameObject.Find("[Client]")) {
 			client = GameObject.Find("[Client]").GetComponent<Client>();
 		} else {
-			gameObject.SetActive(false);
+			if (player == null) {
+				gameObject.SetActive(false);
+			}
 		}
 	}
 
 	void Update () {
-		if (client) {
+		if (client || player) {
 			if (player == null) {
 				player = client.clientPlayer;
 				return;
