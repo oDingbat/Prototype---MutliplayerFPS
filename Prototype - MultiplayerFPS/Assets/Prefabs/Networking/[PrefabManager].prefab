@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &100100000
+Prefab:
+  m_ObjectHideFlags: 1
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications: []
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 0}
+  m_RootGameObject: {fileID: 1630414771259168}
+  m_IsPrefabAsset: 1
+--- !u!1 &1630414771259168
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4361313453646310}
+  - component: {fileID: 114879527089658834}
+  m_Layer: 0
+  m_Name: '[PrefabManager]'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4361313453646310
+Transform:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1630414771259168}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 0
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &114879527089658834
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1630414771259168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 760456364547bf644a9082c26c1779bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  weaponDrops:
+  - {fileID: 1163750177495994, guid: bdc344d1c3ebe574082866269415f8b0, type: 2}
+  pickups:
+  - {fileID: 1093449228003110, guid: 1d586dd15cb0b734494bb5c9ce46e21c, type: 2}
+  - {fileID: 1612542748086348, guid: ce2a697023a5dfb45afb3cf56c454603, type: 2}
+  - {fileID: 1007795579360684, guid: 9c1acae80ca3a4c43baf792a733c2779, type: 2}
+  - {fileID: 1063526440404270, guid: 26053dae4bc1bf24cb3a46f104c5e4b4, type: 2}
+  - {fileID: 1622265015208090, guid: 27c202cc17f2082468ae5a951c45d2b2, type: 2}
+  - {fileID: 1940222380347638, guid: b14e1c402278a364687bd9bba971779d, type: 2}
+  player: {fileID: 1966871052328652, guid: 9e983d22fe41a7543abba59b3166af59, type: 2}

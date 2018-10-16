@@ -237,7 +237,7 @@ public abstract class Entity : MonoBehaviour {
 		if (networkPerspective == NetworkPerspective.Peer || networkPerspective == NetworkPerspective.Client) {
 			client.DestroyEntity(entityId);
 		} else {
-			gameServer.DestroyEntity(entityId);
+			gameServer.DestroyEntity(entityId, true);
 		}
 	}
 	#endregion

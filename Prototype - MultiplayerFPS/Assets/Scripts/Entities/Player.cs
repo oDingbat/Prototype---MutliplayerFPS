@@ -12,6 +12,7 @@ public class Player : Entity {
 
 	[Space(10)][Header("Layer Masks")]
 	public LayerMask collisionMask;
+	public LayerMask interactionMask;
 
 	[Space(10)][Header("References")]
 	public Camera camera;                   // The camera attached to this player
@@ -21,6 +22,7 @@ public class Player : Entity {
 	public GizmoWizard gizmoWizard;
 	public UIManager uiManager;
 	public GameObject model;
+	public PrefabManager prefabManager;
 
 	[Space(10)][Header("Weapon Info")]
 	public List<Weapon> weapons;
@@ -37,7 +39,8 @@ public class Player : Entity {
 	// Other Constants
 	float timeLastHeldFire;					// The time at which the player last held the FIRE button
 	float timeLastPressedFire;              // The time at which the player last pressed the FIRE button
-	float weaponFireForgiveness = 0.125f;	// The button press forgiveness for firing a weapon
+	float weaponFireForgiveness = 0.125f;   // The button press forgiveness for firing a weapon
+	float interactionReach = 3f;			// The maximum interaction reach of the player (how far away objects can be while the player can still interact with them)
 
 	// Movement Private variables
 	public Vector3 velocity;
@@ -47,8 +50,8 @@ public class Player : Entity {
 	Vector3 rotationDesiredLerp;
 	Vector3 groundNormal;
 	Vector3 positionDesired;
-	Vector3 headVelocity;
-	Vector3 headVelocityDesired;
+	public Vector3 headVelocity;
+	public Vector3 headVelocityDesired;
 	bool isGrounded = false;										// Is the player current on the ground?
 	bool isCrouching = false;
 	bool isSneaking = false;
@@ -104,6 +107,7 @@ public class Player : Entity {
 	private void GetInitialReferences () {
 		model = transform.Find("[Model]").gameObject;
 		head = model.transform.Find("[Camera] (Player)");
+		prefabManager = GameObject.Find("[PrefabManager]").GetComponent<PrefabManager>();
 
 		// Client References
 		if (networkPerspective == NetworkPerspective.Client) {
@@ -207,6 +211,25 @@ public class Player : Entity {
 		if (Input.GetKey(KeyCode.Space)) {
 			timeLastHeldJump = Time.time;
 		}
+		
+		// Interaction
+		if (Input.GetKeyDown(KeyCode.E)) {
+			SendClientRPC("TryInteract", new string[] { transform.position.x.ToString(), transform.position.y.ToString(), transform.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
+		}
+		
+		// Weapon Switching
+		if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1)) {
+			AttemptSwitchWeapon(0);
+		}
+		if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2)) {
+			AttemptSwitchWeapon(1);
+		}
+
+		// Weapon Dropping
+		if (Input.GetKeyDown(KeyCode.G)) {
+			SendRPC("AttemptDropWeapon", new string[] { transform.position.x.ToString(), transform.position.y.ToString(), transform.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
+		}
+
 	}
 
 	private void UpdateClient_Movement() {
@@ -346,9 +369,9 @@ public class Player : Entity {
 
 			// Head Movement
 			float headHeightCurrent = (timeLastGrounded + 0.25f >= Time.time && isCrouching == true) ? headHeightCrouching : headHeightStanding;
-			headVelocityMultiplier = Mathf.Lerp(headVelocityMultiplier, 2.5f, 5f * Time.deltaTime);
+			headVelocityMultiplier = Mathf.Lerp(headVelocityMultiplier, 2.5f, 1f * Time.deltaTime);
 
-			head.transform.localPosition += Vector3.ClampMagnitude(headVelocity * Time.deltaTime * headVelocityMultiplier, Vector3.Distance(head.transform.localPosition, new Vector3(0, headHeightCurrent, 0)));
+			head.transform.localPosition += headVelocity * Time.deltaTime * headVelocityMultiplier;
 			head.transform.localPosition = Vector3.ClampMagnitude(head.transform.localPosition - new Vector3(0, headHeightCurrent, 0), 1f) + new Vector3(0, headHeightCurrent, 0);
 			headVelocityDesired = Vector3.ClampMagnitude(new Vector3(0, headHeightCurrent, 0) - head.transform.localPosition, 0.5f) * 6.25f;
 			headVelocity = Vector3.Lerp(headVelocity, headVelocityDesired, 15f * headVelocityMultiplier * Time.deltaTime);
@@ -557,55 +580,101 @@ public class Player : Entity {
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 		if (weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) {         // Firerate check
 			timeLastPressedFire = -Mathf.Infinity;
-			FireWeapon();
+			StartCoroutine(FireWeapon());
 		}
 	}
 
-	public void FireWeapon () {
-		Vector3 origin = head.transform.position + (head.transform.forward * 0.1f) + new Vector3(0, -0.1f, 0);
-		Vector3 direction = head.transform.forward;
-
-		SpawnProjectile(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z);
-	}
-
-	public bool SpawnProjectile (float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
-		// Checks
-		if (vitals.isDead == true) {
-			return false;
-		}
-
-		// Get current weapon
+	public IEnumerator FireWeapon () {
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 
-		if (weaponCurrent.weaponAttributes.ammoCurrent >= weaponCurrent.weaponAttributes.consumption) {
-			// Adjust weaponAttributes
-			weaponCurrent.weaponAttributes.ammoCurrent -= weaponCurrent.weaponAttributes.consumption;
-			weaponCurrent.weaponAttributes.timeLastFired = Time.time;
+		weaponCurrent.weaponAttributes.timeLastFired = Time.time;
 
-			SendClientRPC("SpawnProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), dirX.ToString(), dirY.ToString(), dirZ.ToString() });
+		// Create a projectile for each burst
+		float burstDelayClamped = Mathf.Clamp(weaponCurrent.weaponAttributes.burstDelay, 0.01f, (1 / weaponCurrent.weaponAttributes.firerate) / (float)(weaponCurrent.weaponAttributes.burstCount));
+		for (int i = 0; i < Mathf.Clamp(weaponCurrent.weaponAttributes.burstCount, 1, Mathf.Infinity); i++) {
+			Vector3 origin = head.transform.position + (head.transform.forward * 0.1f) + new Vector3(0, -0.1f, 0);
+			Vector3 direction = head.transform.forward;
+			SpawnProjectile(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z);
 
-			// Get Weapon/Projectile variables
-			Vector3 origin = new Vector3(originX, originY, originZ);
-			Vector3 direction = new Vector3(dirX, dirY, dirZ);
+			yield return new WaitForSeconds(burstDelayClamped);
+		}
+	}
 
-			// Spawn projectile
-			Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
-			newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
-			projectiles.Add(projectileIdIncrement, newProjectile);
-			projectileIdIncrement++;                // Increment projectileIdIncrement
+	private void UpdateWeapon() {
+		Weapon weaponCurrent = weapons[weaponCurrentIndex];
+		WeaponAttributes weaponAttributes = weaponCurrent.weaponAttributes;
+		if (Input.GetMouseButton(1)) {
+			// Zoom In
+			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
+		} else {
+			// Zoom Out
+			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
+		}
 
-			// Play Audio
-			if (networkPerspective != NetworkPerspective.Server) {
-				audioManager.PlayClipAtPoint(Vector3.forward * 0.25f, weaponCurrent.clip_Fire, 0.25f, 1.0f, 100, head);
-			}
+		float defaultFOV = 95f;
+		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+	}
+	
+	#region Server RPCs
+	public void PickupAmmo(int weaponIndex, int ammoAmount) {
+		SendRPC("PickupAmmo", new string[] { weaponIndex.ToString(), ammoAmount.ToString() });
+
+		weapons[weaponIndex].weaponAttributes.ammoCurrent = Mathf.Clamp(weapons[weaponIndex].weaponAttributes.ammoCurrent + ammoAmount, 0, weapons[weaponIndex].weaponAttributes.ammoMax);
+	}
+	public void GrabWeaponDrop (int weaponDropEntityId) {
+		SendRPC("GrabWeaponDrop", new string[] { weaponDropEntityId.ToString() });
+
+		int newWeaponIndexLocation;
+
+		// If Player already has 2 weapons, drop the currently held weapon
+		if (weapons.Count == 2) {       // Check if we already have 1 weapons
+			newWeaponIndexLocation = weaponCurrentIndex;		// Replace the currently held weapon
+			// DropWeapon
+		} else {
+			newWeaponIndexLocation = 1;                         // Place the new weapon in the secondary slot
+			weapons.Add(new Weapon());									// Add a null weapon so that the index for the new weapon is created
+		}
+		
+		// 1 : Set currentWeapon to weaponDrop weapon
+		// 2 : Destroy weaponDrop entity and remove it from client/gameServer entities dictionary
+		if (networkPerspective == NetworkPerspective.Server) {
+			weapons[newWeaponIndexLocation] = new Weapon((gameServer.entities[weaponDropEntityId] as WeaponDrop).weapon);
+			gameServer.DestroyEntity(weaponDropEntityId, false);
+		} else {
+			weapons[newWeaponIndexLocation] = new Weapon((client.entities[weaponDropEntityId] as WeaponDrop).weapon);
+			client.DestroyEntity(weaponDropEntityId);
+		}
+
+		// If we picked up a weapon and didnt drop one we already had, switch to the new weapon
+		if (newWeaponIndexLocation != weaponCurrentIndex) {
+			AttemptSwitchWeapon(newWeaponIndexLocation);												// Perform a weapon switch on the gameServer side
+			SendRPC("AttemptSwitchWeapon", new string[] { newWeaponIndexLocation.ToString() });			// Relay this weapon switch rpc to all of the clients
+		}
+	}
+	public void DropWeapon (int weaponIndex, float originX, float originY, float originZ, float rotX, float rotY) {
+		SendRPC("DropWeapon", new string[] { weaponIndex.ToString(), originX.ToString(), originY.ToString(), originZ.ToString(), rotX.ToString(), rotY.ToString() });
+
+		Vector3 origin = new Vector3(originX, originY, originZ); // TODO: CLAMP
+		//WeaponDrop newWeaponDrop = Instantiate(prefabManager.weaponDrops[weapons[weaponCurrentIndex]], origin);
+	}
+	#endregion
+
+	#region Client RPCs
+	public bool AttemptSwitchWeapon(int weaponIndex) {
+		Weapon weaponCurrent = weapons[weaponCurrentIndex];
+
+		if ((networkPerspective != NetworkPerspective.Client || weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) && (weapons.Count >= weaponIndex + 1)) {		// TODO: dont really think the firerate thing is safe enough, might lead to some bugs
+			SendClientRPC("AttemptSwitchWeapon", new string[] { weaponIndex.ToString() });
+
+			weaponCurrentIndex = weaponIndex;
+			// TODO: Switch weapon animations, change UI, etc
 
 			return true;
 		} else {
 			return false;
 		}
 	}
-
-	public bool ProjectileDamage (int entityId, int projectileId, float directionX, float directionY, float directionZ) {
+	public bool ProjectileDamage(int entityId, int projectileId, float directionX, float directionY, float directionZ) {
 		// Checks
 		if (vitals.isDead == true) {
 			return false;
@@ -613,8 +682,8 @@ public class Player : Entity {
 
 		SendClientRPC("ProjectileDamage", new string[] { entityId.ToString(), projectileId.ToString(), directionX.ToString(), directionY.ToString(), directionZ.ToString() });
 
-		if (projectiles.ContainsKey(projectileId)) {		// Make sure this projectile even exists
-			// If this isn't the Client's Player, destroy the projectile
+		if (projectiles.ContainsKey(projectileId)) {        // Make sure this projectile even exists
+															// If this isn't the Client's Player, destroy the projectile
 			if (networkPerspective != NetworkPerspective.Client) {
 				if (projectiles.ContainsKey(projectileId) == true && projectiles[projectileId].projectileAttributes.entityPenetration == false) {
 					StartCoroutine(projectiles[projectileId].DestroyProjectile(true));
@@ -636,27 +705,69 @@ public class Player : Entity {
 			return false;
 		}
 	}
-
-	private void UpdateWeapon() {
-		Weapon weaponCurrent = weapons[weaponCurrentIndex];
-		WeaponAttributes weaponAttributes = weaponCurrent.weaponAttributes;
-		if (Input.GetMouseButton(1)) {
-			// Zoom In
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
-		} else {
-			// Zoom Out
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
+	public bool SpawnProjectile(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+		// Checks
+		if (vitals.isDead == true) {
+			return false;
 		}
 
-		float defaultFOV = 95f;
-		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
-	}
+		// Get current weapon
+		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 
-	public void PickupAmmo (int weaponIndex, int ammoAmount) {
-		SendRPC("PickupAmmo", new string[] { weaponIndex.ToString(), ammoAmount.ToString() } );
+		if (weaponCurrent.weaponAttributes.ammoCurrent >= weaponCurrent.weaponAttributes.consumption) {
+			SendClientRPC("SpawnProjectile", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), dirX.ToString(), dirY.ToString(), dirZ.ToString() });
 
-		weapons[weaponIndex].weaponAttributes.ammoCurrent = Mathf.Clamp(weapons[weaponIndex].weaponAttributes.ammoCurrent + ammoAmount, 0, weapons[weaponIndex].weaponAttributes.ammoMax);
+			// Adjust weaponAttributes
+			weaponCurrent.weaponAttributes.ammoCurrent -= weaponCurrent.weaponAttributes.consumption;
+
+			// Get Weapon/Projectile variables
+			Vector3 origin = new Vector3(originX, originY, originZ);
+			Vector3 direction = new Vector3(dirX, dirY, dirZ);
+
+			// Spawn projectile
+			Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
+			newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
+			projectiles.Add(projectileIdIncrement, newProjectile);
+			projectileIdIncrement++;                // Increment projectileIdIncrement
+
+			// Play Audio
+			if (networkPerspective != NetworkPerspective.Server) {
+				audioManager.PlayClipAtPoint(Vector3.forward * 0.25f, weaponCurrent.clip_Fire, 0.25f, 1.0f, 100, head);
+			}
+
+			return true;
+		} else {
+			return false;
+		}
 	}
+	public bool TryInteract (float originX, float originY, float originZ, float rotX, float rotY) {
+		// This Client RPC is called by the Client, sent to the GameServer, and then the GameSever attempts to interact with anything available to interact with
+		SendClientRPC("TryInteract", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), rotX.ToString(), rotY.ToString() });
+
+		Debug.LogError("Interaction Call!");
+
+		// Get origin and direction
+		Vector3 origin = new Vector3(originX, originY, originZ);
+		Vector3 direction = Quaternion.Euler(rotX, rotY, 0) * Vector3.forward;
+		origin = Vector3.ClampMagnitude(origin - transform.position, 1f) + transform.position;      // Clamp origin; Basically making sure the origin of this interaction call is only a set magnitude away from the players current position (basic anti-cheat to keep player from grabbing items very far away)
+
+		RaycastHit hit;
+		if (Physics.Raycast(origin, direction, out hit, interactionReach, interactionMask)) {
+			if (hit.transform.GetComponent<WeaponDrop>()) {
+				GrabWeaponDrop(hit.transform.GetComponent<WeaponDrop>().entityId);
+			}
+		}
+
+		return false;			// Return false because this method doesn't need to be called on any clients, only on the Server to attempt to interact
+	}
+	public bool AttemptDropWeapon (float originX, float originY, float originZ, float rotX, float rotY) {
+		// Attempt to drop the Player's weapon; if possible, drop weapon and relay msg to clients
+		if (networkPerspective == NetworkPerspective.Server && weapons.Count > 0) {
+			DropWeapon(weaponCurrentIndex, originX, originY, originZ, rotX, rotY);
+		}
+		return false;
+	}
+	#endregion
 
 	#region Vitals
 	public override void Damage(int damage, float knockbackX, float knockbackY, float knockbackZ) {

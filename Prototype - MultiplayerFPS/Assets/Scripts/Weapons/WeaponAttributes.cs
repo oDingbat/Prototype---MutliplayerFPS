@@ -15,6 +15,8 @@ public class WeaponAttributes {
 	public bool automatic;
 	public float firerate;                                      // The number of times this weapon can fire per second (ex: 10 = 10 shots per second)
 	public float timeLastFired;                                 // The time at which the weapon was last fired
+	public int burstCount;                                      // The number of bursts of projectiles created when firing this weapon
+	public float burstDelay;
 
 	[Space(10)][Header("Zoom Info")]
 	public float zoomIncrement;

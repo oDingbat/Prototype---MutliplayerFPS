@@ -94,7 +94,7 @@ public abstract class Pickup : Entity {
 
 	#region Entity Methods
 	public override void InitializeEntity(string[] data) {
-		// Initializes the entity's values		// TODO:		shouldn't Client/Server set networkPerspective? Save code readability
+		// Initializes the entity's values
 		// Pickup specific InitializeEntity structure: { entityId | entityType | prefabPoolIndex | posX | posY | posZ | isRespawning }
 
 		// Set Entity variables

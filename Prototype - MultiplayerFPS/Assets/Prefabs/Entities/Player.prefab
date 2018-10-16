@@ -963,10 +963,15 @@ MonoBehaviour:
   allowedClientRPCMethodNames:
   - SpawnProjectile
   - ProjectileDamage
+  - AttemptSwitchWeapon
+  - TryInteract
   playerName: 
   collisionMask:
     serializedVersion: 2
     m_Bits: 2048
+  interactionMask:
+    serializedVersion: 2
+    m_Bits: 32768
   camera: {fileID: 20673727124996902}
   head: {fileID: 4454890201870602}
   collider: {fileID: 136732716935987800}
@@ -975,7 +980,7 @@ MonoBehaviour:
   uiManager: {fileID: 0}
   model: {fileID: 0}
   weapons:
-  - name: Rail Gun
+  - name: Heavy Machine Gun
     weaponAttributes:
       ammoCurrent: 453
       ammoMax: 16
@@ -984,6 +989,8 @@ MonoBehaviour:
       automatic: 1
       firerate: 10
       timeLastFired: 0
+      burstCount: 1
+      burstDelay: 0
       zoomIncrement: 10
       zoomDecrement: 10
       zoomCurrent: 0
@@ -991,7 +998,7 @@ MonoBehaviour:
     projectileAttributes:
       damage: 100
       knockback: 5
-      muzzleVelocity: 250
+      muzzleVelocity: 750
       ricochetCount: 3
       ricochetMaxAngle: 45
       gravityScale: 1
@@ -1012,6 +1019,8 @@ MonoBehaviour:
   speedMax: 35
   accelerationStrafing: 3
   velocity: {x: 0, y: 0, z: 0}
+  headVelocity: {x: 0, y: 0, z: 0}
+  headVelocityDesired: {x: 0, y: 0, z: 0}
   text_SpeedOMeter: {fileID: 0}
   clip_Footstep: {fileID: 8300000, guid: a2ef5f39f4d42a04ea2c6e3b36e5455b, type: 3}
   clip_Damage: {fileID: 8300000, guid: b4076d4f75bd02541870f1f12c13aded, type: 3}

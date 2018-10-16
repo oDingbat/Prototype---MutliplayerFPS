@@ -41,7 +41,7 @@ public class GameServer : MonoBehaviour {
 	}
 
 	[Space(10)][Header("Prefabs")]
-	public GameObject prefab_Player;
+	public PrefabManager prefabManager;
 
 	float timeReachedPopulationZero = 60;           // The time at which the GameServer reached a population of zero (starts at 30 to give the gameserver 30 seconds to get populated)
 	float populationZeroTimoutBuffer = 60f;			// The amount of time the GameServer will wait before it times out once the server pop reaches zero
@@ -267,7 +267,7 @@ public class GameServer : MonoBehaviour {
 			players.Remove(disconnectedPlayer);
 
 			// Destroy player's entity
-			DestroyEntity(disconnectedPlayer.entityId);
+			DestroyEntity(disconnectedPlayer.entityId, true);
 
 			// Check if we need to set populationTimer
 			if (players.Count == 0) {
@@ -287,7 +287,7 @@ public class GameServer : MonoBehaviour {
 			ConnectedPlayer playerKicked = players.Single(p => p.connectionId == connectionId);
 
 			// Destroy player's entity
-			DestroyEntity(playerKicked.entityId);
+			DestroyEntity(playerKicked.entityId, true);
 
 			// Remove player
 			players.Remove(playerKicked);
@@ -295,15 +295,17 @@ public class GameServer : MonoBehaviour {
 		
 		// TODO: Tell remaining players that a player was kicked
 	}
-	public void DestroyEntity (int entityId) {
+	public void DestroyEntity (int entityId, bool relayToClients) {
 		// Destroys an entity and tells every connect client to do so aswell
 		if (entities.ContainsKey(entityId)) {       // Make sure this entity even exists
 			Destroy(entities[entityId].gameObject);
 			entities.Remove(entityId);
 
-			string newMessage = "Data_EntityDestroy|" + entityId;               // TODO: possibly add position of entity?
+			if (relayToClients == true) {
+				string newMessage = "Data_EntityDestroy|" + entityId;
 
-			Send(newMessage, connectionData_GameServer.channelReliable, players);
+				Send(newMessage, connectionData_GameServer.channelReliable, players);
+			}
 		}
 	}
 	#endregion
@@ -423,7 +425,7 @@ public class GameServer : MonoBehaviour {
 		// Initializes new client's player entity and tells the new client the details
 
 		// Create new player entity and add it to the server's list of entities
-		Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
+		Player newPlayer = Instantiate(prefabManager.player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 		ConnectedPlayer cPlayer = players.Single(p => p.connectionId == connectionId);
 		Entity newEntity = newPlayer;
 

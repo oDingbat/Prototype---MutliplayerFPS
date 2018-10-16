@@ -32,8 +32,7 @@ public class Client : MonoBehaviour {
 	public Transform[] respawnPoints;
 
 	[Space(10)][Header("Prefabs")]
-	public GameObject[] prefabPool_Pickups;
-	public GameObject prefab_Player;
+	public PrefabManager prefabManager;
 
 	public Dictionary<int, Entity> entities = new Dictionary<int, Entity>();
 
@@ -296,6 +295,8 @@ public class Client : MonoBehaviour {
 	private void Receive_Data_ExecuteRPC (string[] splitData) {
 		// Sends rpcData to a specified Entity to call an RPC method (healing, picking up items, changing entity data, etc)
 
+		Debug.Log(string.Join("|", splitData));
+
 		// RPC structure: { Data_ExecuteRPC | entityId | rpcData }
 
 		int entityId = int.Parse(splitData[1]);
@@ -326,13 +327,18 @@ public class Client : MonoBehaviour {
 
 		switch (entityType) {
 			case ("Player"):
-				Player newPlayer = Instantiate(prefab_Player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
+				Player newPlayer = Instantiate(prefabManager.player, Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Player>();
 				newEntity = newPlayer;
 				break;
 			case ("AmmoPickup"): case ("StackPickup"):
 				int prefabPoolIndex = int.Parse(entityData[2]);
-				Pickup newPickup = Instantiate(prefabPool_Pickups[prefabPoolIndex], Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Pickup>();
+				Pickup newPickup = Instantiate(prefabManager.pickups[prefabPoolIndex], Vector3.zero, Quaternion.identity, container_Entities).GetComponent<Pickup>();
 				newEntity = newPickup;
+				break;
+			case ("WeaponDrop"):
+				int prefabPoolIndex2 = int.Parse(entityData[2]);
+				WeaponDrop newWeaponDrop = Instantiate(prefabManager.weaponDrops[prefabPoolIndex2], Vector3.zero, Quaternion.identity, container_Entities).GetComponent<WeaponDrop>();
+				newEntity = newWeaponDrop;
 				break;
 		}
 
@@ -357,6 +363,7 @@ public class Client : MonoBehaviour {
 		}
 	}
 	public void DestroyEntity (int entityId) {
+		Debug.Log("Destroying Entity :" + entityId);
 		Destroy(entities[entityId].gameObject);
 		entities.Remove(entityId);
 	}

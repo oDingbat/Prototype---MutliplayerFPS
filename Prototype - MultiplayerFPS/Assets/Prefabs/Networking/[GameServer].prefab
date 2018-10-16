@@ -89,8 +89,7 @@ MonoBehaviour:
   - {fileID: 0}
   respawnTime: 5
   entityIteration: 0
-  prefab_Player: {fileID: 1966871052328652, guid: 9e983d22fe41a7543abba59b3166af59,
-    type: 2}
+  prefabManager: {fileID: 0}
   text_Debug_MasterServer: {fileID: 0}
   text_Debug_Clients: {fileID: 0}
   text_Debug_Entities: {fileID: 0}
