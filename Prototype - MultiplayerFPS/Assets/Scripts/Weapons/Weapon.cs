@@ -24,7 +24,7 @@ public class Weapon {
 	public Weapon (Weapon copiedWeapon) {
 		name = copiedWeapon.name;
 		prefabPoolIndex = copiedWeapon.prefabPoolIndex;
-		weaponAttributes = copiedWeapon.weaponAttributes;
+		weaponAttributes = new WeaponAttributes(copiedWeapon.weaponAttributes);
 
 		projectileAttributes = new ProjectileAttributes(copiedWeapon.projectileAttributes);
 

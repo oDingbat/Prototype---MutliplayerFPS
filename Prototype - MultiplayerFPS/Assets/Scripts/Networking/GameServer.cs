@@ -311,14 +311,34 @@ public class GameServer : MonoBehaviour {
 	#endregion
 
 	#region Gameplay Methods
+	public void CreateEntity (Entity entity) {
+		// Adds a specified entity to entities dictionary and relays CreatEntity to Clients		// TODO: possibly rename method? We aren't really creating the entity here, just adding it to Entities and relaying initialization to clients
+		entities.Add(entityIteration, entity);
+		entity.entityId = entityIteration;
+
+		string entityData = entityIteration + "%" + entity.GetType().Name + "%" + entity.GetEntityInitializeData();
+
+		string newMessage = "Data_InitializeEntity|" + entityData;
+
+		Send(newMessage, connectionData_GameServer.channelReliableSequenced, players);
+
+		entityIteration++;
+	}
+	public int FetchNewEntityId () {
+		int newEntityId = entityIteration;
+		entityIteration++;
+		return newEntityId;
+	}
 	public void Gameplay_PlayerDied (Player player) {
 		StartCoroutine(Gameplay_PlayerRespawning(player));
 	}
 	private IEnumerator Gameplay_PlayerRespawning (Player player) {
 		yield return new WaitForSeconds(respawnTime);
 
-		int respawnPointIndex = Random.Range(0, respawnPoints.Length);
-		player.Revive(100, 50, respawnPointIndex);
+		if (player != null) {		// Make sure the player is still in the game
+			int respawnPointIndex = Random.Range(0, respawnPoints.Length);
+			player.Revive(100, 50, respawnPointIndex);
+		}
 	}
 	#endregion
 
@@ -437,7 +457,7 @@ public class GameServer : MonoBehaviour {
 		newPlayer.GetEntityReferences();
 
 		// Structure: { EntityId | EntityType | EntityData }
-		string entityData = entityIteration + "%" + newEntity.GetType().Name + "%" + connectionId + "%" + cPlayer.name + "%0%5%0";
+		string entityData = entityIteration + "%" + newEntity.GetType().Name + "%" + connectionId + "%" + cPlayer.name + "%0%5%0";					// TODO: verify order matches Player class? Simply call player's getData?
 
 		// Initialize the player entity on the server side
 		newPlayer.InitializeEntity(entityData.Split('%'));       // InitializeEntity on Server side
@@ -450,7 +470,7 @@ public class GameServer : MonoBehaviour {
 	public void Send_Data_InitializeEntity (Entity entity, string entityData) {
 		// Sends data to connected clients in order to initialize a single Entity
 
-		// Create the EntityInitialization message with format: { Data_InitializeEntity | EntityType | EntityId | EntityData }
+		// Create the EntityInitialization message with format: { Data_InitializeEntity | EntityId | EntityType | EntityData }
 		string newMessage = "Data_InitializeEntity|" + entityData;
 
 		// Send message over reliableChannel to all clients connected

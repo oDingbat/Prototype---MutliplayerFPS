@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[RequireComponent (typeof(SphereCollider))]
 public class Projectile : MonoBehaviour {
 
 	[Space(10)][Header("Collision Masks")]
@@ -19,6 +20,9 @@ public class Projectile : MonoBehaviour {
 	[Space(10)][Header("Attributes")]
 	public ProjectileAttributes projectileAttributes;
 	public int projectileId;
+	public bool isStuck;
+	public bool hasCollided;
+	public float firstCollisionTime;
 	
 	List<Entity> damagedEntities = new List<Entity>();
 
@@ -38,7 +42,7 @@ public class Projectile : MonoBehaviour {
 		trailRenderer = model.GetComponent<TrailRenderer>();
 
 		// Add parentPlayer to damagedEntities as to ignore it on collision
-		damagedEntities.Add(player);
+		//damagedEntities.Add(player);
 
 		// Set Attributes
 		projectileId = newProjectileId;
@@ -56,10 +60,12 @@ public class Projectile : MonoBehaviour {
 	}
 
 	private void Update () {
-		if (timeCreated + projectileAttributes.lifespan >= Time.time) {
+		if (timeCreated + projectileAttributes.lifespan >= Time.time && (projectileAttributes.hasDelayedCollisionDetonation == false || hasCollided == false || firstCollisionTime + projectileAttributes.delayedCollisionDetonationTime > Time.time)) {
 			UpdateMovement();
 		} else {
-			StartCoroutine(DestroyProjectile(true));
+			if (isStuck == false) {
+				StartCoroutine(DestroyProjectile(true));
+			}
 		}
 	}
 
@@ -76,6 +82,12 @@ public class Projectile : MonoBehaviour {
 		if (Physics.SphereCast(transform.position, projectileAttributes.projectileRadius, velocity, out hit, deltaP + skinWidth, collisionMask)) {
 			float ricochetAngle = Vector3.Angle(velocity, Vector3.Reflect(velocity, hit.normal));
 			float trueHitDistance = hit.distance - skinWidth;
+
+			// Delayed Collision Detonation Info
+			if (hasCollided == false) {
+				hasCollided = true;
+				firstCollisionTime = Time.time;
+			}
 
 			// Player Damage
 			if (hit.transform.gameObject.layer == LayerMask.NameToLayer("Players")) {
@@ -121,10 +133,20 @@ public class Projectile : MonoBehaviour {
 				leftoverDeltaP = Mathf.Clamp(deltaP, 0, Mathf.Infinity);
 			} else {
 				// Move projectile forwards based on collisionDistance
-				transform.position += (velocity.normalized * trueHitDistance);
+				transform.position += (velocity.normalized * (trueHitDistance + skinWidth));
 
-				// Destroy Projectile
-				StartCoroutine(DestroyProjectile(false));
+				// If this projectile is sticky, make it stick
+				if (projectileAttributes.isSticky == true) {
+					transform.SetParent(hit.transform, true);
+
+					isStuck = true;
+
+					// Destroy Projectile + stickyDelay
+					StartCoroutine(DestroyProjectile(false, projectileAttributes.stickyLifespan));
+				} else {
+					// Destroy Projectile
+					StartCoroutine(DestroyProjectile(false));
+				}
 			}
 		} else {
 			transform.position += (velocity * Time.deltaTime);
@@ -134,11 +156,15 @@ public class Projectile : MonoBehaviour {
 		velocity += new Vector3(0, projectileAttributes.gravityScale * -9.81f * Time.deltaTime, 0);
 	}
 
-	public IEnumerator DestroyProjectile (bool instantlyDestroy = false) {
+	public IEnumerator DestroyProjectile (bool instantlyDestroy = false, float additionalDelay = 0) {
 		// Remove projectile from parentPlayer projectiles Dictionary
 		if (parentPlayer.projectiles.ContainsKey(projectileId)) {
 			parentPlayer.projectiles.Remove(projectileId);
 		}
+
+		// Disable collider
+		
+		projectileCollider.enabled = false;
 
 		if (instantlyDestroy == true) {
 			Destroy(gameObject);
@@ -146,6 +172,10 @@ public class Projectile : MonoBehaviour {
 			isDestroyed = true;
 
 			yield return new WaitForSeconds(projectileAttributes.trailRendererTime);
+
+			trailRenderer.enabled = false;
+
+			yield return new WaitForSeconds(additionalDelay);
 
 			Destroy(gameObject);
 		}

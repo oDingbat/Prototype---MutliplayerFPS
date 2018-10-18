@@ -16,6 +16,7 @@ public class Player : Entity {
 
 	[Space(10)][Header("References")]
 	public Camera camera;                   // The camera attached to this player
+	public DeathCamera deathCamera;
 	public Transform head;
 	public CapsuleCollider collider;
 	public Rigidbody rigidbody;
@@ -70,11 +71,15 @@ public class Player : Entity {
 	
 	[Space(10)][Header("UI")]
 	public Text text_SpeedOMeter;
+	public string interactionDescription;
 	
 	[Space(10)][Header("Audio")]
 	public AudioClip clip_Footstep;
 	public AudioClip clip_Damage;
 	public AudioSource audioSource_Wind;
+
+	[Space(10)] [Header("Prefabs")]
+	public Transform ragdollCurrent;
 
 	private void Start () {
 		GetInitialReferences();
@@ -108,6 +113,14 @@ public class Player : Entity {
 		model = transform.Find("[Model]").gameObject;
 		head = model.transform.Find("[Camera] (Player)");
 		prefabManager = GameObject.Find("[PrefabManager]").GetComponent<PrefabManager>();
+
+		// Death Camera
+		deathCamera = transform.Find("[Camera] (DeathCamera)").GetComponent<DeathCamera>();
+		if (networkPerspective == NetworkPerspective.Client) {
+			deathCamera.GetComponent<AudioListener>().enabled = true;
+			deathCamera.GetComponent<Camera>().enabled = true;
+		}
+		deathCamera.gameObject.SetActive(false);
 
 		// Client References
 		if (networkPerspective == NetworkPerspective.Client) {
@@ -160,10 +173,15 @@ public class Player : Entity {
 
 	private void UpdateClient() {
 		rigidbody.velocity = Vector3.zero;
-		UpdateClient_Input();
-		UpdateClient_Movement();
+
+		if (vitals.isDead == false) {
+			UpdateClient_Input();
+			UpdateClient_Movement();
+			FetchInteractionData();
+		}
 	}
 
+	#region Client ONLY Methods
 	private void UpdateClient_Input() {
 		// Updates player input
 
@@ -175,7 +193,7 @@ public class Player : Entity {
 		
 		// Get rotation input
 		if (uiManager.isPaused == false) {
-			float zoomMultiplier = Mathf.Lerp(1f, (weapons[weaponCurrentIndex].weaponAttributes.zoomFOVMultiplier * 1f), weapons[weaponCurrentIndex].weaponAttributes.zoomCurrent * 0.5f);
+			float zoomMultiplier = (weapons.Count > 0 ? Mathf.Lerp(1f, (weapons[weaponCurrentIndex].weaponAttributes.zoomFOVMultiplier * 1f), weapons[weaponCurrentIndex].weaponAttributes.zoomCurrent * 0.5f) : 1);
 			rotationDesired = new Vector3(Mathf.Clamp(rotationDesired.x - (Input.GetAxis("Mouse Y") * zoomMultiplier), -90f, 90f), rotationDesired.y + (Input.GetAxis("Mouse X") * zoomMultiplier), 0);
 		}
 
@@ -191,8 +209,10 @@ public class Player : Entity {
 		}
 
 		// Attemp firing
-		if (timeLastPressedFire + weaponFireForgiveness >= Time.time || (weapons[weaponCurrentIndex].weaponAttributes.automatic && timeLastHeldFire >= Time.time)) {
-			AttemptFireWeapon();
+		if (weapons.Count > 0) {
+			if (timeLastPressedFire + weaponFireForgiveness >= Time.time || (weapons[weaponCurrentIndex].weaponAttributes.automatic && timeLastHeldFire >= Time.time)) {
+				AttemptFireWeapon();
+			}
 		}
 		
 		// Crouching
@@ -214,7 +234,7 @@ public class Player : Entity {
 		
 		// Interaction
 		if (Input.GetKeyDown(KeyCode.E)) {
-			SendClientRPC("TryInteract", new string[] { transform.position.x.ToString(), transform.position.y.ToString(), transform.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
+			SendClientRPC("TryInteract", new string[] { head.position.x.ToString(), head.position.y.ToString(), head.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
 		}
 		
 		// Weapon Switching
@@ -227,11 +247,10 @@ public class Player : Entity {
 
 		// Weapon Dropping
 		if (Input.GetKeyDown(KeyCode.G)) {
-			SendRPC("AttemptDropWeapon", new string[] { transform.position.x.ToString(), transform.position.y.ToString(), transform.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
+			SendClientRPC("AttemptDropWeapon", new string[] { transform.position.x.ToString(), transform.position.y.ToString(), transform.position.z.ToString(), rotationDesired.x.ToString(), rotationDesired.y.ToString() });
 		}
 
 	}
-
 	private void UpdateClient_Movement() {
 		if (collider != null) {
 			rigidbody.velocity = Vector3.zero;
@@ -381,7 +400,6 @@ public class Player : Entity {
 			ResizeBodyCollider(headHeightMultiplier);
 		}
 	}
-
 	private void ResizeBodyCollider (float lerpValue) {
 		float newHeight = Mathf.Lerp(0.9f, 1.90f, lerpValue);
 		Vector3 newCenter = new Vector3(0, Mathf.Lerp(-0.45f, 0, lerpValue), 0);
@@ -411,7 +429,6 @@ public class Player : Entity {
 			collider.center = newCenter;
 		}
 	}
-
 	private Vector3 GetWallInfo () {
 		// Gets info about nearby walls; important for performing walljumps
 		
@@ -437,7 +454,6 @@ public class Player : Entity {
 
 		return wallNormal;
 	}
-
 	private void MovePlayerVertically (Vector3 deltaPos) {
 		// Moves the player vertically via deltaPos
 
@@ -521,7 +537,6 @@ public class Player : Entity {
 		}
 
 	}
-
 	private IEnumerator PlayDelayedFootstepLanding (float delay) {
 		timeLastLanded = Time.time;
 		headVelocityMultiplier = 1.0f;
@@ -536,7 +551,6 @@ public class Player : Entity {
 		positionLastStepped = transform.position;
 		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
 	}
-
 	private void MovePlayerHorizontally (Vector3 deltaPos) {
 		// Moves the player horizontally via deltaPos
 		
@@ -574,8 +588,12 @@ public class Player : Entity {
 			}
 		}
 	}
-
 	private void AttemptFireWeapon () {
+		// Make sure we have any weapons
+		if (weapons.Count > 0 == false) {
+			return;
+		}
+
 		// Attempt to fire weapon
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 		if (weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) {         // Firerate check
@@ -583,7 +601,6 @@ public class Player : Entity {
 			StartCoroutine(FireWeapon());
 		}
 	}
-
 	public IEnumerator FireWeapon () {
 		Weapon weaponCurrent = weapons[weaponCurrentIndex];
 
@@ -599,82 +616,147 @@ public class Player : Entity {
 			yield return new WaitForSeconds(burstDelayClamped);
 		}
 	}
-
 	private void UpdateWeapon() {
-		Weapon weaponCurrent = weapons[weaponCurrentIndex];
-		WeaponAttributes weaponAttributes = weaponCurrent.weaponAttributes;
-		if (Input.GetMouseButton(1)) {
-			// Zoom In
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
-		} else {
-			// Zoom Out
-			weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
-		}
+		if (weapons.Count > 0) {
+			Weapon weaponCurrent = weapons[weaponCurrentIndex];
+			WeaponAttributes weaponAttributes = weaponCurrent.weaponAttributes;
+			if (Input.GetMouseButton(1)) {
+				// Zoom In
+				weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent + (weaponAttributes.zoomIncrement * Time.deltaTime));
+			} else {
+				// Zoom Out
+				weaponAttributes.zoomCurrent = Mathf.Clamp01(weaponAttributes.zoomCurrent - (weaponAttributes.zoomDecrement * Time.deltaTime));
+			}
 
-		float defaultFOV = 95f;
-		camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+			float defaultFOV = 95f;
+			camera.fieldOfView = Mathf.Lerp(defaultFOV, defaultFOV * weaponAttributes.zoomFOVMultiplier, weaponAttributes.zoomCurrent);
+		}
 	}
-	
+	private void FetchInteractionData () {
+		// A Client side only method which checks to see if any interactable objects are available and displays that interaction data in the HUD
+
+		Vector3 origin = head.position;
+		Vector3 direction = head.forward;
+
+		RaycastHit hit;
+		if (Physics.Raycast(origin, direction, out hit, interactionReach, interactionMask)) {
+			if (hit.transform.GetComponent<Entity>()) {
+				Entity hitEntity = hit.transform.GetComponent<Entity>();
+
+				if (hitEntity is WeaponDrop) {
+					interactionDescription = ("Press 'E' to equip '" + (hitEntity as WeaponDrop).weapon.name + "'");
+				} else {
+					interactionDescription = "";
+				}
+			} else {
+				interactionDescription = "";
+			}
+		} else {
+			interactionDescription = "";
+		}
+	}
+	#endregion
+
 	#region Server RPCs
 	public void PickupAmmo(int weaponIndex, int ammoAmount) {
 		SendRPC("PickupAmmo", new string[] { weaponIndex.ToString(), ammoAmount.ToString() });
 
 		weapons[weaponIndex].weaponAttributes.ammoCurrent = Mathf.Clamp(weapons[weaponIndex].weaponAttributes.ammoCurrent + ammoAmount, 0, weapons[weaponIndex].weaponAttributes.ammoMax);
 	}
-	public void GrabWeaponDrop (int weaponDropEntityId) {
-		SendRPC("GrabWeaponDrop", new string[] { weaponDropEntityId.ToString() });
+	public void GrabWeaponDrop (int weaponDropEntityId, int newWeaponIndex) {
+		// Grabs a specified weapon
 
-		int newWeaponIndexLocation;
-
-		// If Player already has 2 weapons, drop the currently held weapon
-		if (weapons.Count == 2) {       // Check if we already have 1 weapons
-			newWeaponIndexLocation = weaponCurrentIndex;		// Replace the currently held weapon
-			// DropWeapon
-		} else {
-			newWeaponIndexLocation = 1;                         // Place the new weapon in the secondary slot
-			weapons.Add(new Weapon());									// Add a null weapon so that the index for the new weapon is created
-		}
-		
-		// 1 : Set currentWeapon to weaponDrop weapon
-		// 2 : Destroy weaponDrop entity and remove it from client/gameServer entities dictionary
 		if (networkPerspective == NetworkPerspective.Server) {
-			weapons[newWeaponIndexLocation] = new Weapon((gameServer.entities[weaponDropEntityId] as WeaponDrop).weapon);
+			// If we already have 2 weapons, drop the current weapon
+			if (weapons.Count == 2) {
+				newWeaponIndex = weaponCurrentIndex;
+				weaponDropEntityId = gameServer.FetchNewEntityId();
+				DropWeapon(weaponCurrentIndex, weaponDropEntityId, transform.position.x, transform.position.y, transform.position.z, rotationDesired.x, rotationDesired.y, false);
+			} else {
+				newWeaponIndex = weapons.Count;
+			}
+		}
+
+		// Pickup the weaponDrop
+		weapons.Add(new Weapon());
+		if (networkPerspective == NetworkPerspective.Server) {
+			weapons[newWeaponIndex] = new Weapon((gameServer.entities[weaponDropEntityId] as WeaponDrop).weapon);
 			gameServer.DestroyEntity(weaponDropEntityId, false);
 		} else {
-			weapons[newWeaponIndexLocation] = new Weapon((client.entities[weaponDropEntityId] as WeaponDrop).weapon);
+			weapons[newWeaponIndex] = new Weapon((client.entities[weaponDropEntityId] as WeaponDrop).weapon);
 			client.DestroyEntity(weaponDropEntityId);
 		}
 
-		// If we picked up a weapon and didnt drop one we already had, switch to the new weapon
-		if (newWeaponIndexLocation != weaponCurrentIndex) {
-			AttemptSwitchWeapon(newWeaponIndexLocation);												// Perform a weapon switch on the gameServer side
-			SendRPC("AttemptSwitchWeapon", new string[] { newWeaponIndexLocation.ToString() });			// Relay this weapon switch rpc to all of the clients
-		}
-	}
-	public void DropWeapon (int weaponIndex, float originX, float originY, float originZ, float rotX, float rotY) {
-		SendRPC("DropWeapon", new string[] { weaponIndex.ToString(), originX.ToString(), originY.ToString(), originZ.ToString(), rotX.ToString(), rotY.ToString() });
+		// Tell the clients to grab the weapon drop
+		SendRPC("GrabWeaponDrop", new string[] { weaponDropEntityId.ToString(), newWeaponIndex.ToString() });
 
+		// Switch weapons
+		SwitchWeapon(newWeaponIndex);
+	}
+	public void DropWeapon (int weaponIndex, int newEntityId, float originX, float originY, float originZ, float rotX, float rotY, bool switchOnDrop) {
+		
+		// Make sure we have a weapon at the specified weaponIndex
+		if (weapons.Count > weaponIndex == false) {
+			return;
+		}
+
+		// If this is the GameServer, fetch a new entityId for this weaponDrop
+		if (networkPerspective == NetworkPerspective.Server && newEntityId == -1) {
+			newEntityId = gameServer.FetchNewEntityId();
+		}
+		
+		// Instantiate the weaponDrop
+		Weapon weaponBeingDropped = weapons[weaponIndex];
 		Vector3 origin = new Vector3(originX, originY, originZ); // TODO: CLAMP
-		//WeaponDrop newWeaponDrop = Instantiate(prefabManager.weaponDrops[weapons[weaponCurrentIndex]], origin);
+		WeaponDrop newWeaponDrop = Instantiate(prefabManager.weaponDrops[weaponBeingDropped.prefabPoolIndex], origin, Quaternion.identity, prefabManager.container_Entities).GetComponent<WeaponDrop>();
+		newWeaponDrop.entityId = newEntityId;
+		newWeaponDrop.weapon = new Weapon(weaponBeingDropped);
+		prefabManager.AddEntityToDictionary(newWeaponDrop);
+
+		// Remove this weapon from weapons
+		weapons.Remove(weaponBeingDropped);
+
+		// Switch Weapons
+		if (switchOnDrop == true) {
+			SwitchWeapon(Mathf.Max(weapons.Count - 1, 0));
+		}
+
+		SendRPC("DropWeapon", new string[] { weaponIndex.ToString(), newEntityId.ToString(), originX.ToString(), originY.ToString(), originZ.ToString(), rotX.ToString(), rotY.ToString(), switchOnDrop.ToString() });
+	}
+	public void SwitchWeapon (int weaponIndex) {
+		if (weapons.Count > 0) {
+			if (weapons.Count > weaponIndex) {
+				weaponCurrentIndex = weaponIndex;
+			} else {
+				weaponCurrentIndex = weapons.Count - 1;
+			}
+		} else {
+			// TODO: Hold out hands? idk
+			weaponCurrentIndex = 0;
+		}
 	}
 	#endregion
 
 	#region Client RPCs
 	public bool AttemptSwitchWeapon(int weaponIndex) {
-		Weapon weaponCurrent = weapons[weaponCurrentIndex];
+		if (weapons.Count > 0) {
+			Weapon weaponCurrent = weapons[weaponCurrentIndex];
 
-		if ((networkPerspective != NetworkPerspective.Client || weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) && (weapons.Count >= weaponIndex + 1)) {		// TODO: dont really think the firerate thing is safe enough, might lead to some bugs
-			SendClientRPC("AttemptSwitchWeapon", new string[] { weaponIndex.ToString() });
+			if ((networkPerspective != NetworkPerspective.Client || weaponCurrent.weaponAttributes.timeLastFired + (1f / weaponCurrent.weaponAttributes.firerate) <= Time.time) && (weapons.Count >= weaponIndex + 1)) {        // TODO: dont really think the firerate thing is safe enough, might lead to some bugs
+				SendClientRPC("AttemptSwitchWeapon", new string[] { weaponIndex.ToString() });
 
-			weaponCurrentIndex = weaponIndex;
-			// TODO: Switch weapon animations, change UI, etc
+				weaponCurrentIndex = weaponIndex;
+				// TODO: Switch weapon animations, change UI, etc
 
-			return true;
+				return true;
+			} else {
+				return false;
+			}
 		} else {
 			return false;
 		}
 	}
-	public bool ProjectileDamage(int entityId, int projectileId, float directionX, float directionY, float directionZ) {
+	public bool ProjectileDamage (int entityId, int projectileId, float directionX, float directionY, float directionZ) {
 		// Checks
 		if (vitals.isDead == true) {
 			return false;
@@ -705,7 +787,7 @@ public class Player : Entity {
 			return false;
 		}
 	}
-	public bool SpawnProjectile(float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
+	public bool SpawnProjectile (float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
 		// Checks
 		if (vitals.isDead == true) {
 			return false;
@@ -724,11 +806,19 @@ public class Player : Entity {
 			Vector3 origin = new Vector3(originX, originY, originZ);
 			Vector3 direction = new Vector3(dirX, dirY, dirZ);
 
-			// Spawn projectile
-			Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up)).GetComponent<Projectile>();
-			newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
-			projectiles.Add(projectileIdIncrement, newProjectile);
-			projectileIdIncrement++;                // Increment projectileIdIncrement
+			// Spawn mutliple projectiles based on length of 'weapon.weaponAttributes.projectileSpreads' array
+			for (int i = 0; i < Mathf.Clamp(weaponCurrent.weaponAttributes.projectileSpreads.Length, 1, Mathf.Infinity); i++) {
+				Quaternion spreadRotationOffset = Quaternion.identity;
+				if (weaponCurrent.weaponAttributes.projectileSpreads.Length > 0 && weaponCurrent.weaponAttributes.projectileSpreads.Length >= i) {
+					spreadRotationOffset = Quaternion.LookRotation(new Vector3(weaponCurrent.weaponAttributes.projectileSpreads[i].x, weaponCurrent.weaponAttributes.projectileSpreads[i].y, 10), Vector3.up);
+				}
+
+				// Spawn projectile
+				Projectile newProjectile = Instantiate(weaponCurrent.prefab_Projectile, origin, Quaternion.LookRotation(direction, Vector3.up) * spreadRotationOffset).GetComponent<Projectile>();
+				newProjectile.InitializeProjectile(projectileIdIncrement, weaponCurrent.projectileAttributes, networkPerspective, this);
+				projectiles.Add(projectileIdIncrement, newProjectile);
+				projectileIdIncrement++;                // Increment projectileIdIncrement
+			}
 
 			// Play Audio
 			if (networkPerspective != NetworkPerspective.Server) {
@@ -744,8 +834,6 @@ public class Player : Entity {
 		// This Client RPC is called by the Client, sent to the GameServer, and then the GameSever attempts to interact with anything available to interact with
 		SendClientRPC("TryInteract", new string[] { originX.ToString(), originY.ToString(), originZ.ToString(), rotX.ToString(), rotY.ToString() });
 
-		Debug.LogError("Interaction Call!");
-
 		// Get origin and direction
 		Vector3 origin = new Vector3(originX, originY, originZ);
 		Vector3 direction = Quaternion.Euler(rotX, rotY, 0) * Vector3.forward;
@@ -754,7 +842,7 @@ public class Player : Entity {
 		RaycastHit hit;
 		if (Physics.Raycast(origin, direction, out hit, interactionReach, interactionMask)) {
 			if (hit.transform.GetComponent<WeaponDrop>()) {
-				GrabWeaponDrop(hit.transform.GetComponent<WeaponDrop>().entityId);
+				GrabWeaponDrop(hit.transform.GetComponent<WeaponDrop>().entityId, -1);
 			}
 		}
 
@@ -763,7 +851,7 @@ public class Player : Entity {
 	public bool AttemptDropWeapon (float originX, float originY, float originZ, float rotX, float rotY) {
 		// Attempt to drop the Player's weapon; if possible, drop weapon and relay msg to clients
 		if (networkPerspective == NetworkPerspective.Server && weapons.Count > 0) {
-			DropWeapon(weaponCurrentIndex, originX, originY, originZ, rotX, rotY);
+			DropWeapon(weaponCurrentIndex, -1, originX, originY, originZ, rotX, rotY, true);
 		}
 		return false;
 	}
@@ -789,7 +877,7 @@ public class Player : Entity {
 			vitals.healthCurrent = Mathf.Clamp(vitals.healthCurrent - healthDmg, 0, vitals.healthMaximum);     // Set the entity's health
 
 			if (networkPerspective == NetworkPerspective.Server && vitals.healthCurrent == 0) {            // If the entity's health is now zero, kill it
-				Die();
+				Die(knockbackX, knockbackY, knockbackZ);
 			}
 		}
 
@@ -799,18 +887,31 @@ public class Player : Entity {
 		Vector3 knockbackForce = new Vector3(knockbackX, knockbackY, knockbackZ);
 		velocity += knockbackForce;
 	}
-	public override void Die() {
+	public override void Die(float knockbackX = 0, float knockbackY = 0, float knockbackZ = 0, int ragdollEntityId = -1) {
 		// Kills the entity, regardless of whether it is invulnerable or not
-		SendRPC("Die", null);
 
+		// If this is gameServer; fetch a new EntityId for this ragdoll
+		if (ragdollEntityId == -1 && networkPerspective == NetworkPerspective.Server) {
+			ragdollEntityId = gameServer.FetchNewEntityId();
+		}
+		
+		// Set vitals
 		vitals.healthCurrent = 0;       // Set health to zero incase this method was called outside of this class
 		vitals.isDead = true;           // Set isDead to true
-		model.SetActive(false);
+		
+		// Spawn Ragdoll
+		ragdollCurrent = prefabManager.SpawnEntity(prefabManager.ragdoll_Player.GetComponent<Entity>(), ragdollEntityId, transform.position, Quaternion.Euler(rotationDesired.x, rotationDesired.y, 0)).transform;
+		ragdollCurrent.GetComponent<Rigidbody>().velocity = new Vector3(knockbackX, knockbackY, knockbackZ) + velocity;
+
+		// Enable Death Camera
+		ToggleDeathCamera(true);
 
 		// Tell the gameServer this player died so it can revive them when the time comes
 		if (networkPerspective == NetworkPerspective.Server) {
 			gameServer.Gameplay_PlayerDied(this);
 		}
+
+		SendRPC("Die", new string[] { knockbackX.ToString(), knockbackY.ToString(), knockbackZ.ToString(), ragdollEntityId.ToString() });
 	}
 	public override void Revive(int newHealth, int newArmor, int respawnPointIndex) {
 		// Revives the entity
@@ -820,6 +921,9 @@ public class Player : Entity {
 		vitals.armorCurrent = newArmor;
 		vitals.isDead = false;           // Set isDead to true
 
+		// Disable Death Camera
+		ToggleDeathCamera(false);
+
 		// Position player
 		Transform respawnPoint = null;
 		if (networkPerspective == NetworkPerspective.Server) {
@@ -828,10 +932,28 @@ public class Player : Entity {
 			respawnPoint = client.respawnPoints[respawnPointIndex];
 		}
 
+		// Set Player position/rotation based on respawnPoint data
 		transform.position = respawnPoint.transform.position;
 		rotationDesired = new Vector3(respawnPoint.transform.localEulerAngles.x, respawnPoint.transform.localEulerAngles.y, 0);
 		camera.transform.localEulerAngles = new Vector3(rotationDesired.x, 0, 0);       // Camera Up/Down rotation
 		transform.localEulerAngles = new Vector3(0, rotationDesired.y, 0);              // Player Left/Right rotation
+	}
+	private void ToggleDeathCamera (bool toggle) {
+		if (toggle == true) {
+			// Enable death camera
+			collider.enabled = false;
+			model.SetActive(false);
+			
+			deathCamera.gameObject.SetActive(true);
+			deathCamera.InitializeDeathCamera(ragdollCurrent, camera.transform.rotation);
+		} else {
+			// Disable death camera
+			collider.enabled = true;
+			model.SetActive(true);
+
+			deathCamera.gameObject.SetActive(false);
+			deathCamera.targetRagdoll = null;
+		}
 	}
 	#endregion
 
@@ -872,8 +994,7 @@ public class Player : Entity {
 	}
 	public override string GetEntityInitializeData () {
 		// Returns the data necessary to initialize this entity
-
-
+		
 		// InitializeStructure : ownerClientId % playerName % posX % posY % posZ
 
 		string newData = ownerClientId + "%" + playerName + "%" + transform.position.x + "%" + transform.position.y + "%" + transform.position.z;

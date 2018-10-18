@@ -79,7 +79,7 @@ public abstract class Entity : MonoBehaviour {
 			vitals.healthCurrent = Mathf.Clamp(vitals.healthCurrent - healthDmg, 0, vitals.healthMaximum);     // Set the entity's health
 
 			if (networkPerspective == NetworkPerspective.Server && vitals.healthCurrent == 0) {            // If the entity's health is now zero, kill it
-				Die();
+				Die(knockbackX, knockbackY, knockbackZ);
 			}
 		}
 	}
@@ -103,7 +103,7 @@ public abstract class Entity : MonoBehaviour {
 			vitals.armorCurrent = Mathf.Clamp(vitals.armorCurrent + heal, 0, vitals.armorMaximum + overarmorPotential);     // Set the entity's health
 		}
 	}
-	public virtual void Die () {
+	public virtual void Die (float knockbackX = 0, float knockbackY = 0, float knockbackZ = 0, int ragdollEntityId = -1) {
 		// Kills the entity, regardless of whether it is invulnerable or not
 		SendRPC("Die", null);
 

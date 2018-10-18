@@ -16,7 +16,15 @@ public class ProjectileAttributes {
 	public float gravityScale;          // The amount of gravity applied to this projectile per second (1 = -9.81 units/second)
 	public float bouncinessMin;         // The bounciness coefficient; defines how much velocity the projectile retains after each bounce
 	public float bouncinessMax;         // The bounciness coefficient; defines how much velocity the projectile retains after each bounce
-	public bool entityPenetration;		// Can this projectile penetrate through an entity?
+	public bool entityPenetration;      // Can this projectile penetrate through an entity?
+
+	[Space(10)][Header("Sticky Attributes")]
+	public bool isSticky;               // Is this projectile sticky? Ie: does it stick to surfaces on contact?
+	public float stickyLifespan;        // The amount of time the projectile will stick to it's target before destroying
+
+	[Space(10)][Header("Detonation Attributes")]
+	public bool hasDelayedCollisionDetonation;		// Does this collision detonate after it's first collision AFTER delayedCollisionDetonationTime has elapsed?
+	public float delayedCollisionDetonationTime;
 
 	[Space(10)][Header("Other Attributes")]
 	public float projectileRadius;      // The radius of the projectile
@@ -26,6 +34,7 @@ public class ProjectileAttributes {
 	public ProjectileAttributes (ProjectileAttributes copiedProjectileAttributes) {
 		damage = copiedProjectileAttributes.damage;
 		knockback = copiedProjectileAttributes.knockback;
+
 		muzzleVelocity = copiedProjectileAttributes.muzzleVelocity;
 		ricochetCount = copiedProjectileAttributes.ricochetCount;
 		ricochetMaxAngle = copiedProjectileAttributes.ricochetMaxAngle;
@@ -33,6 +42,12 @@ public class ProjectileAttributes {
 		bouncinessMin = copiedProjectileAttributes.bouncinessMin;
 		bouncinessMax = copiedProjectileAttributes.bouncinessMax;
 		entityPenetration = copiedProjectileAttributes.entityPenetration;
+		isSticky = copiedProjectileAttributes.isSticky;
+		stickyLifespan = copiedProjectileAttributes.stickyLifespan;
+
+		hasDelayedCollisionDetonation = copiedProjectileAttributes.hasDelayedCollisionDetonation;
+		delayedCollisionDetonationTime = copiedProjectileAttributes.delayedCollisionDetonationTime;
+
 		projectileRadius = copiedProjectileAttributes.projectileRadius;
 		trailRendererTime = copiedProjectileAttributes.trailRendererTime;
 		lifespan = copiedProjectileAttributes.lifespan;

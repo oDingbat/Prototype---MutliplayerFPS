@@ -18,9 +18,33 @@ public class WeaponAttributes {
 	public int burstCount;                                      // The number of bursts of projectiles created when firing this weapon
 	public float burstDelay;
 
+	[Space(10)][Header("Mutli-Projectile Info")]
+	public Vector2[] projectileSpreads;			// The array of projectileSpreads which defines the direction modifier applied to each projectile
+
 	[Space(10)][Header("Zoom Info")]
 	public float zoomIncrement;
 	public float zoomDecrement;
 	public float zoomCurrent;
 	public float zoomFOVMultiplier;
+
+	public WeaponAttributes (WeaponAttributes copiedWeaponAttributes) {
+		ammoCurrent = copiedWeaponAttributes.ammoCurrent;
+		ammoMax = copiedWeaponAttributes.ammoMax;
+		ammoType = copiedWeaponAttributes.ammoType;
+		consumption = copiedWeaponAttributes.consumption;
+
+		automatic = copiedWeaponAttributes.automatic;
+		firerate = copiedWeaponAttributes.firerate;
+		timeLastFired = copiedWeaponAttributes.timeLastFired;
+		burstCount = copiedWeaponAttributes.burstCount;
+		burstDelay = copiedWeaponAttributes.burstDelay;
+
+		projectileSpreads = copiedWeaponAttributes.projectileSpreads;
+
+		zoomIncrement = copiedWeaponAttributes.zoomIncrement;
+		zoomDecrement = copiedWeaponAttributes.zoomDecrement;
+		zoomCurrent = copiedWeaponAttributes.zoomCurrent;
+		zoomFOVMultiplier = copiedWeaponAttributes.zoomFOVMultiplier;
+	}
+
 }
