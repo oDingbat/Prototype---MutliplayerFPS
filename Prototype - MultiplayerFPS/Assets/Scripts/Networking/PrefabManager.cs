@@ -31,6 +31,10 @@ public class PrefabManager : MonoBehaviour {
 		if (prefabEntity.gameObject != null) {
 			Entity newEntity = Instantiate(prefabEntity.gameObject, position, rotation).GetComponent<Entity>();		// Spawn the entityPrefab
 			newEntity.entityId = entityId;          // Set the entityPrefab's entityId
+			newEntity.GetEntityReferences();
+
+			newEntity.networkPerspective = (client ? NetworkPerspective.Client : NetworkPerspective.Server);
+
 			AddEntityToDictionary(newEntity);
 			return newEntity;
 		} else {

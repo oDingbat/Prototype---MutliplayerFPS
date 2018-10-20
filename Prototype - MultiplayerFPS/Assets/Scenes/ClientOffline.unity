@@ -158,6 +158,11 @@ Prefab:
       propertyPath: uiManager
       value: 
       objectReference: {fileID: 1508801072}
+    - target: {fileID: 114226762070735638, guid: 9e983d22fe41a7543abba59b3166af59,
+        type: 2}
+      propertyPath: weapons.Array.data[0].projectileAttributes.muzzleVelocity
+      value: 750
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9e983d22fe41a7543abba59b3166af59, type: 2}
   m_IsPrefabAsset: 0

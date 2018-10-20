@@ -8,70 +8,70 @@ using UnityEngine.UI;
 public class Player : Entity {
 
 	[Space(10)][Header("Player Data")]
-	public string playerName;
+	public string playerName;						// The name of this player
 
 	[Space(10)][Header("Layer Masks")]
-	public LayerMask collisionMask;
-	public LayerMask interactionMask;
+	public LayerMask collisionMask;					// The LayerMask used to detect movement collisions
+	public LayerMask interactionMask;				// The LayerMask used to detect interactions the player performs with the environment
 
-	[Space(10)][Header("References")]
-	public Camera camera;                   // The camera attached to this player
-	public DeathCamera deathCamera;
-	public Transform head;
-	public CapsuleCollider collider;
-	public Rigidbody rigidbody;
+	[Space(10)][Header("Player Component References")]
+	public Camera camera;							// The camera attached to this player
+	public DeathCamera deathCamera;					// The death camera for this player (used on client only; enabled on Player.Die)
+	public Transform head;							// The head transform for this player (main camera transform)
+	public CapsuleCollider collider;				// The capsule collider used for this player's movement collision detection
+	public Rigidbody rigidbody;						// The rigidbody of this player (used to move Players outside of geometry)
+	public GameObject model;						// The model attached to this player (contains player's body model and player's main camera)
+
+	[Space(10)][Header("Outside Class References")]
 	public GizmoWizard gizmoWizard;
 	public UIManager uiManager;
-	public GameObject model;
 	public PrefabManager prefabManager;
 
 	[Space(10)][Header("Weapon Info")]
-	public List<Weapon> weapons;
-	public int weaponCurrentIndex;
+	public List<Weapon> weapons;					// The list of weapons this player is currently carrying
+	public int weaponCurrentIndex;					// The index in the 'weapons' list indicating the player's currently equiped weapon
 
 	[Space(10)][Header("Movement Settings")]
-	public float slopeMax = 50;										// The maximum slope angle the player can climb
+	public float slopeMax = 50;						// The maximum slope angle the player can climb
 	public float skinWidth = 0.001f;
-	public float speed = 14f;                                       // Maximum speed walking
-	public float speedCrouching = 6f;								// Maximum speed crouching
-	public float speedMax = 30f;                                    // Maximum possible spee
-	public float accelerationStrafing = 3f;                         // The acceleration constant which is applied to the player's speed while strafing
+	public float speed = 14f;						// Maximum speed walking
+	public float speedCrouching = 6f;				// Maximum speed crouching
+	public float speedMax = 30f;					// Maximum possible spee
+	public float accelerationStrafing = 3f;			// The acceleration constant which is applied to the player's speed while strafing
 
 	// Other Constants
-	float timeLastHeldFire;					// The time at which the player last held the FIRE button
-	float timeLastPressedFire;              // The time at which the player last pressed the FIRE button
-	float weaponFireForgiveness = 0.125f;   // The button press forgiveness for firing a weapon
-	float interactionReach = 3f;			// The maximum interaction reach of the player (how far away objects can be while the player can still interact with them)
+	float timeLastHeldFire;							// The time at which the player last held the FIRE button
+	float timeLastPressedFire;						// The time at which the player last pressed the FIRE button
+	float weaponFireForgiveness = 0.125f;			// The button press forgiveness for firing a weapon
+	float interactionReach = 3f;					// The maximum interaction reach of the player (how far away objects can be while the player can still interact with them)
 
-	// Movement Private variables
-	public Vector3 velocity;
-	Vector3 inputMovement;                  // The input for the player's movement
-	Vector3 positionLastStepped;
-	Vector3 rotationDesired;
-	Vector3 rotationDesiredLerp;
-	Vector3 groundNormal;
-	Vector3 positionDesired;
-	public Vector3 headVelocity;
-	public Vector3 headVelocityDesired;
-	bool isGrounded = false;										// Is the player current on the ground?
-	bool isCrouching = false;
-	bool isSneaking = false;
-	float timeLastGrounded = -Mathf.Infinity;
-	float timeLastJumped = -Mathf.Infinity;
-	float timeLastHeldJump = -Mathf.Infinity;
-	float timeLastPressedJump = -Mathf.Infinity;
+	// Movement Private Variables
+	public Vector3 velocity;						// The current velocity of the player
+	Vector3 inputMovement;							// The input for the player's movement
+	Vector3 positionLastStepped;					// The position at which the player last 'stepped'
+	Vector3 rotationDesired;						// The desired rotation of the player
+	Vector3 rotationDesiredLerp;					// The desired rotation of the player, lerped
+	Vector3 positionDesired;						// The desired position of the player
+	Vector3 groundNormal;							// The normal direction of the ground the player is touching
+	bool isGrounded = false;						// Is the player current on the ground?
+	bool isCrouching = false;						// Is the player currently crouching?
+	bool isSneaking = false;						// Is the player currently sneaking?
+	float timeLastGrounded = -Mathf.Infinity;		// The time the player was last touching the ground
+	float timeLastJumped = -Mathf.Infinity;			// The time that player has last jumped
+	float timeLastHeldJump = -Mathf.Infinity;		// The time the player last held the 'jump' key
+	float timeLastPressedJump = -Mathf.Infinity;    // The time the player last pressed the 'jump' key
 	float timeLastLanded;
-	float headVelocityMultiplier;
-	float headHeightStanding = 0.9f;
-	float headHeightCrouching = -0.1f;
-	
-	// Projectiles
-	public Dictionary<int, Projectile> projectiles = new Dictionary<int, Projectile>();
-	int projectileIdIncrement = 0;
-	
+
+	// Head Movement Private Variables
+	public Vector3 headVelocity;                    // The velocity of the player's head (used for view bobbing)
+	public Vector3 headVelocityDesired;             // The desired velocity of the player's head
+	float headVelocityMultiplier;					// The velocity multiplier used to dictate how quickly the head moves via headVelocity
+	float headHeightStanding = 0.9f;				// The desired local height of the player's head when standing
+	float headHeightCrouching = -0.1f;              // The desired local height of the player's head when crouching
+
 	[Space(10)][Header("UI")]
 	public Text text_SpeedOMeter;
-	public string interactionDescription;
+	public string interactionDescription;			// The description of the item the Player can currently interact with
 	
 	[Space(10)][Header("Audio")]
 	public AudioClip clip_Footstep;
@@ -81,6 +81,11 @@ public class Player : Entity {
 	[Space(10)] [Header("Prefabs")]
 	public Transform ragdollCurrent;
 
+	// Projectiles
+	public Dictionary<int, Projectile> projectiles = new Dictionary<int, Projectile>();
+	int projectileIdIncrement = 0;
+
+	#region Initial Methods
 	private void Start () {
 		GetInitialReferences();
 		
@@ -88,7 +93,6 @@ public class Player : Entity {
 			StartCoroutine(StackDecay());
 		}
 	}
-
 	private IEnumerator StackDecay () {
 		while (true) {
 			yield return new WaitForSeconds(1);
@@ -108,11 +112,14 @@ public class Player : Entity {
 			}
 		}
 	}
-
 	private void GetInitialReferences () {
 		model = transform.Find("[Model]").gameObject;
 		head = model.transform.Find("[Camera] (Player)");
 		prefabManager = GameObject.Find("[PrefabManager]").GetComponent<PrefabManager>();
+
+		if (GameObject.Find("[GizmoWizard]")) {
+			gizmoWizard = GameObject.Find("[GizmoWizard]").GetComponent<GizmoWizard>();
+		}
 
 		// Death Camera
 		deathCamera = transform.Find("[Camera] (DeathCamera)").GetComponent<DeathCamera>();
@@ -135,7 +142,9 @@ public class Player : Entity {
 			head.GetComponent<AudioListener>().enabled = true;
 		}
 	}
+	#endregion
 
+	#region Generic Update Methods
 	private void Update() {
 		switch (networkPerspective) {
 			case (NetworkPerspective.Client):
@@ -149,7 +158,6 @@ public class Player : Entity {
 				break;
 		}
 	}
-
 	private void UpdatePeer() {
 		transform.position = Vector3.Lerp(transform.position, positionDesired, 25 * Time.deltaTime);
 
@@ -158,7 +166,6 @@ public class Player : Entity {
 		camera.transform.localEulerAngles = new Vector3(rotationDesiredLerp.x, 0, 0);
 		transform.localEulerAngles = new Vector3(0, rotationDesiredLerp.y, 0);
 	}
-
 	private void UpdateServer() {
 		// Checks
 		if (vitals.isDead == true) {
@@ -170,7 +177,6 @@ public class Player : Entity {
 		camera.transform.localEulerAngles = new Vector3(rotationDesired.x, 0, 0);       // Camera Up/Down rotation
 		transform.localEulerAngles = new Vector3(0, rotationDesired.y, 0);              // Player Left/Right rotation
 	}
-
 	private void UpdateClient() {
 		rigidbody.velocity = Vector3.zero;
 
@@ -180,6 +186,7 @@ public class Player : Entity {
 			FetchInteractionData();
 		}
 	}
+	#endregion
 
 	#region Client ONLY Methods
 	private void UpdateClient_Input() {
@@ -400,60 +407,6 @@ public class Player : Entity {
 			ResizeBodyCollider(headHeightMultiplier);
 		}
 	}
-	private void ResizeBodyCollider (float lerpValue) {
-		float newHeight = Mathf.Lerp(0.9f, 1.90f, lerpValue);
-		Vector3 newCenter = new Vector3(0, Mathf.Lerp(-0.45f, 0, lerpValue), 0);
-		
-		if (collider.height < newHeight) {      // If the body's height is growing larger
-			// Do a spherecast upwards to make sure the player's body isn't uncrouching into a ceiling
-			float radius = collider.radius;
-			float changeInHeight = newHeight - collider.height;
-
-			Vector3 origin = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f) + collider.center;
-			RaycastHit hit;
-
-			if (Physics.SphereCast(origin, radius, Vector3.up, out hit, changeInHeight + skinWidth, collisionMask)) {
-				float possibleChangeInHeight = hit.distance - skinWidth;
-
-				collider.height = Mathf.Clamp(collider.height + possibleChangeInHeight, 0.9f, 1.9f);
-				collider.center = new Vector3(0, Mathf.Clamp(collider.center.y + (possibleChangeInHeight / 2f), -0.45f, 0f), 0);
-
-				// Clamp head local position
-				head.transform.localPosition = new Vector3(0, Mathf.Lerp(headHeightCrouching, headHeightStanding, (collider.height - 0.9f)));
-			} else {
-				collider.height = newHeight;
-				collider.center = newCenter;
-			}
-		} else {
-			collider.height = newHeight;
-			collider.center = newCenter;
-		}
-	}
-	private Vector3 GetWallInfo () {
-		// Gets info about nearby walls; important for performing walljumps
-		
-		// Variables
-		Vector3 wallNormal = Vector3.zero;
-		float closestWallDistance = Mathf.Infinity;
-
-		// Constants
-		int raycastCount = 8;
-		float walljumpReach = 0.3f;
-		float iterationAngle = 360f / (float)raycastCount;
-
-		for (int i = 0; i < raycastCount; i++) {
-			RaycastHit hit;
-			if (Physics.SphereCast(transform.position, collider.radius - skinWidth, Quaternion.Euler(0, i * iterationAngle, 0) * Vector3.forward, out hit, walljumpReach + skinWidth, collisionMask)) {
-				// Is this the closest hit so far?
-				if (hit.distance < closestWallDistance) {
-					closestWallDistance = hit.distance;
-					wallNormal = hit.normal;
-				}
-			}
-		}
-
-		return wallNormal;
-	}
 	private void MovePlayerVertically (Vector3 deltaPos) {
 		// Moves the player vertically via deltaPos
 
@@ -537,20 +490,6 @@ public class Player : Entity {
 		}
 
 	}
-	private IEnumerator PlayDelayedFootstepLanding (float delay) {
-		timeLastLanded = Time.time;
-		headVelocityMultiplier = 1.0f;
-
-		float velocityDelayMultiplier = new Vector3(velocity.x, 0, velocity.z).magnitude / speedMax;
-
-		positionLastStepped = transform.position;
-		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.25f + 0.25f * velocityDelayMultiplier), UnityEngine.Random.Range(0.75f, 0.85f), head);
-		
-		yield return new WaitForSeconds((delay - (delay * velocityDelayMultiplier * 0.95f)) * UnityEngine.Random.Range(0.95f, 1.05f));
-		
-		positionLastStepped = transform.position;
-		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
-	}
 	private void MovePlayerHorizontally (Vector3 deltaPos) {
 		// Moves the player horizontally via deltaPos
 		
@@ -587,6 +526,74 @@ public class Player : Entity {
 				break;
 			}
 		}
+	}
+	private void ResizeBodyCollider(float lerpValue) {
+		float newHeight = Mathf.Lerp(0.9f, 1.90f, lerpValue);
+		Vector3 newCenter = new Vector3(0, Mathf.Lerp(-0.45f, 0, lerpValue), 0);
+
+		if (collider.height < newHeight) {      // If the body's height is growing larger
+												// Do a spherecast upwards to make sure the player's body isn't uncrouching into a ceiling
+			float radius = collider.radius;
+			float changeInHeight = newHeight - collider.height;
+
+			Vector3 origin = (transform.position + new Vector3(0, (collider.height / 2f) - (collider.radius), 0) * 1f) + collider.center;
+			RaycastHit hit;
+
+			if (Physics.SphereCast(origin, radius, Vector3.up, out hit, changeInHeight + skinWidth, collisionMask)) {
+				float possibleChangeInHeight = hit.distance - skinWidth;
+
+				collider.height = Mathf.Clamp(collider.height + possibleChangeInHeight, 0.9f, 1.9f);
+				collider.center = new Vector3(0, Mathf.Clamp(collider.center.y + (possibleChangeInHeight / 2f), -0.45f, 0f), 0);
+
+				// Clamp head local position
+				head.transform.localPosition = new Vector3(0, Mathf.Lerp(headHeightCrouching, headHeightStanding, (collider.height - 0.9f)));
+			} else {
+				collider.height = newHeight;
+				collider.center = newCenter;
+			}
+		} else {
+			collider.height = newHeight;
+			collider.center = newCenter;
+		}
+	}
+	private Vector3 GetWallInfo() {
+		// Gets info about nearby walls; important for performing walljumps
+
+		// Variables
+		Vector3 wallNormal = Vector3.zero;
+		float closestWallDistance = Mathf.Infinity;
+
+		// Constants
+		int raycastCount = 8;
+		float walljumpReach = 0.3f;
+		float iterationAngle = 360f / (float)raycastCount;
+
+		for (int i = 0; i < raycastCount; i++) {
+			RaycastHit hit;
+			if (Physics.SphereCast(transform.position, collider.radius - skinWidth, Quaternion.Euler(0, i * iterationAngle, 0) * Vector3.forward, out hit, walljumpReach + skinWidth, collisionMask)) {
+				// Is this the closest hit so far?
+				if (hit.distance < closestWallDistance) {
+					closestWallDistance = hit.distance;
+					wallNormal = hit.normal;
+				}
+			}
+		}
+
+		return wallNormal;
+	}
+	private IEnumerator PlayDelayedFootstepLanding(float delay) {
+		timeLastLanded = Time.time;
+		headVelocityMultiplier = 1.0f;
+
+		float velocityDelayMultiplier = new Vector3(velocity.x, 0, velocity.z).magnitude / speedMax;
+
+		positionLastStepped = transform.position;
+		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.25f + 0.25f * velocityDelayMultiplier), UnityEngine.Random.Range(0.75f, 0.85f), head);
+
+		yield return new WaitForSeconds((delay - (delay * velocityDelayMultiplier * 0.95f)) * UnityEngine.Random.Range(0.95f, 1.05f));
+
+		positionLastStepped = transform.position;
+		audioManager.PlayClipAtPoint(new Vector3(0, -1.2f, 0), clip_Footstep, (0.125f + 0.125f * velocityDelayMultiplier), UnityEngine.Random.Range(0.6f, 0.7f), head);
 	}
 	private void AttemptFireWeapon () {
 		// Make sure we have any weapons
@@ -762,7 +769,7 @@ public class Player : Entity {
 			return false;
 		}
 
-		SendClientRPC("ProjectileDamage", new string[] { entityId.ToString(), projectileId.ToString(), directionX.ToString(), directionY.ToString(), directionZ.ToString() });
+		//SendClientRPC("ProjectileDamage", new string[] { entityId.ToString(), projectileId.ToString(), directionX.ToString(), directionY.ToString(), directionZ.ToString() });	// TODO: Does this even need to happen on clients??
 
 		if (projectiles.ContainsKey(projectileId)) {        // Make sure this projectile even exists
 															// If this isn't the Client's Player, destroy the projectile
@@ -786,6 +793,60 @@ public class Player : Entity {
 		} else {
 			return false;
 		}
+	}
+	public bool CheckProjectileExplosion(int projectileId, float posX, float posY, float posZ) {
+		if (projectiles.ContainsKey(projectileId)) {        // Make sure this projectile even exists			// TODO: Is this reliable? (Not really)
+			// This method handle's Projectile's explosion functionality
+
+			// Get projectile
+			Projectile projectile = projectiles[projectileId];
+
+			// Set explosion origin
+			Vector3 explosionOrigin = new Vector3(posX, posY, posZ);                // TODO: Possibly check if this position is reasonable? anti-cheat etc.
+
+			// Find players within blast radius
+			Collider[] playersWithinBlastRadius = Physics.OverlapSphere(explosionOrigin, projectile.projectileAttributes.explosionBlastRadius, projectile.playerMask);
+
+			// Create a list of raycastPositions to check for line of sight
+			List<int> hitPlayerIds = new List<int>();
+			foreach (Collider playerCollider in playersWithinBlastRadius) {
+				Vector3 raycastDirection = (playerCollider.ClosestPoint(explosionOrigin) - explosionOrigin).normalized;
+				RaycastHit hit;
+
+				Debug.DrawRay(explosionOrigin, (playerCollider.ClosestPoint(explosionOrigin) - explosionOrigin), Color.red, 2);
+
+				if (raycastDirection.magnitude < 0.05) {
+					int hitPlayerId = playerCollider.transform.GetComponent<Player>().entityId;
+					if (hitPlayerIds.Contains(hitPlayerId) == false) {
+						hitPlayerIds.Add(hitPlayerId);
+
+						// Damage player
+						Player hitP = playerCollider.transform.GetComponent<Player>();
+						Vector3 explosionKnockback = (playerCollider.transform.position - explosionOrigin).normalized * projectile.projectileAttributes.explosionKnockback;
+						int explosionDamage = projectile.projectileAttributes.explosionDamage;
+						hitP.Damage(explosionDamage, explosionKnockback.x, explosionKnockback.y, explosionKnockback.z);
+					}
+				} else if (Physics.Raycast(explosionOrigin, raycastDirection, out hit, projectile.projectileAttributes.explosionBlastRadius, projectile.collisionMask)) {
+					// Did the raycast hit a Player?
+					if (hit.transform.GetComponent<Player>()) {
+						int hitPlayerId = hit.transform.GetComponent<Player>().entityId;
+						// Make sure we haven't already damaged this player
+						if (hitPlayerIds.Contains(hitPlayerId) == false) {
+							hitPlayerIds.Add(hitPlayerId);
+
+							// Damage the hit player
+							Player hitP = playerCollider.transform.GetComponent<Player>();
+							float distanceMutliplier = Mathf.Lerp(1, 0, hit.distance / projectile.projectileAttributes.explosionBlastRadius);
+							Vector3 explosionKnockback = raycastDirection * projectile.projectileAttributes.explosionKnockback * distanceMutliplier;
+							int explosionDamage = (int)Mathf.Clamp(Mathf.Ceil(projectile.projectileAttributes.explosionDamage * distanceMutliplier), 1, projectile.projectileAttributes.explosionDamage);
+							hitP.Damage(explosionDamage, explosionKnockback.x, explosionKnockback.y, explosionKnockback.z);
+						}
+					}
+				}
+			}
+		}
+
+		return false;		// Don't relay method call to Clients
 	}
 	public bool SpawnProjectile (float originX, float originY, float originZ, float dirX, float dirY, float dirZ) {
 		// Checks
@@ -886,6 +947,9 @@ public class Player : Entity {
 		// Add knockback force
 		Vector3 knockbackForce = new Vector3(knockbackX, knockbackY, knockbackZ);
 		velocity += knockbackForce;
+		if (knockbackY > 0) {
+			isGrounded = false;
+		}
 	}
 	public override void Die(float knockbackX = 0, float knockbackY = 0, float knockbackZ = 0, int ragdollEntityId = -1) {
 		// Kills the entity, regardless of whether it is invulnerable or not
@@ -898,7 +962,8 @@ public class Player : Entity {
 		// Set vitals
 		vitals.healthCurrent = 0;       // Set health to zero incase this method was called outside of this class
 		vitals.isDead = true;           // Set isDead to true
-		
+		velocity = Vector3.zero;		// Zero out velocity (so it isn't retained on revival)
+
 		// Spawn Ragdoll
 		ragdollCurrent = prefabManager.SpawnEntity(prefabManager.ragdoll_Player.GetComponent<Entity>(), ragdollEntityId, transform.position, Quaternion.Euler(rotationDesired.x, rotationDesired.y, 0)).transform;
 		ragdollCurrent.GetComponent<Rigidbody>().velocity = new Vector3(knockbackX, knockbackY, knockbackZ) + velocity;
@@ -958,6 +1023,7 @@ public class Player : Entity {
 	#endregion
 
 	#region Entity Methods
+	// Sets
 	public override void InitializeEntity(string[] data) {
 		// Initializes the entity's values
 		// Player specific InitializeEntity structure: { entityId | entityType | ownerClientId | playerName | posX | poxY | poxZ }
@@ -984,6 +1050,10 @@ public class Player : Entity {
 		positionDesired = new Vector3(float.Parse(data[0]), float.Parse(data[1]), float.Parse(data[2]));
 		rotationDesired = new Vector3(float.Parse(data[3]), float.Parse(data[4]), 0);
 	}
+	public override void ServerUpdateEntity(string[] data) {
+		throw new NotImplementedException();
+	}
+	// Gets
 	public override string GetEntityUpdateData () {
 		// Returns the data necessary to update this entity
 		// UpdateStructure : posX % posY % posZ % rotX % rotY
@@ -1000,6 +1070,9 @@ public class Player : Entity {
 		string newData = ownerClientId + "%" + playerName + "%" + transform.position.x + "%" + transform.position.y + "%" + transform.position.z;
 
 		return newData;
+	}
+	public override string GetServerUpdateData () {
+		throw new NotImplementedException();
 	}
 	#endregion
 }

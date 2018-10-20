@@ -7,6 +7,7 @@ public class Projectile : MonoBehaviour {
 
 	[Space(10)][Header("Collision Masks")]
 	public LayerMask collisionMask;
+	public LayerMask playerMask;
 
 	[Space(10)][Header("Network Settings")]
 	public NetworkPerspective networkPerspective;
@@ -23,7 +24,7 @@ public class Projectile : MonoBehaviour {
 	public bool isStuck;
 	public bool hasCollided;
 	public float firstCollisionTime;
-	
+
 	List<Entity> damagedEntities = new List<Entity>();
 
 	// Constants
@@ -79,6 +80,7 @@ public class Projectile : MonoBehaviour {
 		leftoverDeltaP = 0;
 		RaycastHit hit;
 		
+		// Check for collision
 		if (Physics.SphereCast(transform.position, projectileAttributes.projectileRadius, velocity, out hit, deltaP + skinWidth, collisionMask)) {
 			float ricochetAngle = Vector3.Angle(velocity, Vector3.Reflect(velocity, hit.normal));
 			float trueHitDistance = hit.distance - skinWidth;
@@ -155,11 +157,11 @@ public class Projectile : MonoBehaviour {
 		// Apply Gravity
 		velocity += new Vector3(0, projectileAttributes.gravityScale * -9.81f * Time.deltaTime, 0);
 	}
-
+	
 	public IEnumerator DestroyProjectile (bool instantlyDestroy = false, float additionalDelay = 0) {
-		// Remove projectile from parentPlayer projectiles Dictionary
-		if (parentPlayer.projectiles.ContainsKey(projectileId)) {
-			parentPlayer.projectiles.Remove(projectileId);
+		// If this projectile is explosive, explode
+		if (projectileAttributes.isExplosive == true) {
+			Explode();
 		}
 
 		// Disable collider
@@ -177,8 +179,18 @@ public class Projectile : MonoBehaviour {
 
 			yield return new WaitForSeconds(additionalDelay);
 
+			// Remove projectile from parentPlayer projectiles Dictionary
+			if (parentPlayer.projectiles.ContainsKey(projectileId)) {
+				parentPlayer.projectiles.Remove(projectileId);
+			}
+
 			Destroy(gameObject);
 		}
+	}
+
+	public void Explode() {
+		Vector3 explosionOrigin = transform.position + (velocity.normalized * -0.1f);
+		parentPlayer.SendClientRPC("CheckProjectileExplosion", new string[] { projectileId.ToString(), explosionOrigin.x.ToString(), explosionOrigin.y.ToString(), explosionOrigin.z.ToString() });
 	}
 
 }

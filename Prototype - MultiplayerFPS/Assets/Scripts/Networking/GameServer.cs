@@ -170,7 +170,28 @@ public class GameServer : MonoBehaviour {
 	private void UpdateSend() {
 		if (connectionData_GameServer.isConnected == true) {
 			if (players.Count > 0) {
-				//Send("WOWZ", connectionData_GameServer.channelReliable, players[0]);
+				// Entity GetServerUpdateData Structure : { UpdateAllEntities | Entity0_Data0 $ Entity0_Data1 % Entity1_Data0 $ Entity1_Data1 % etc} 
+				string newMessage = "Data_UpdateServerEntities|";
+
+				// Iterate through each entity; If the entity has serverUpdate enabled, get it's serverUpdateData and add it to the newMessage
+				foreach (KeyValuePair<int, Entity> entityAndId in entities) {
+					Entity entityCurrent = entityAndId.Value;
+					int entityCurrentId = entityAndId.Key;
+
+					if (entityCurrent.sendGameServerUpdates == true) {
+						newMessage += entityCurrentId + "$";
+						newMessage += entityCurrent.GetServerUpdateData();
+						newMessage += "%";
+					}
+				}
+
+				// Trim the trailing '%'
+				newMessage = newMessage.Trim('%');
+
+				if (newMessage != "Data_UpdateServerEntities|") {		// Make sure we are actually sending some data
+					// Send UpdateAllEntities data to all players
+					Send(newMessage, connectionData_GameServer.channelReliableFragmentedSequenced, players);
+				}
 			}
 		}
 	}

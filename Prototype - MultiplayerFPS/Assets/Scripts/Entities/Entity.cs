@@ -14,6 +14,7 @@ public abstract class Entity : MonoBehaviour {
 	public int entityId;
 	public int ownerClientId;
 	public NetworkPerspective networkPerspective;
+	public bool sendGameServerUpdates = false;					// Does this entity relay it's Update call to all clients? (Default = false)
 	public GameServer gameServer;
 	public Client client;
 	public AudioManager audioManager;
@@ -126,10 +127,15 @@ public abstract class Entity : MonoBehaviour {
 	#endregion
 
 	#region Networking Methods
+	// Sets
 	public abstract void InitializeEntity (string[] data);      // Sets specific data about the entity (specific to each type of entity) (ie: entity position, rotation, type, etc)
 	public abstract void UpdateEntity (string[] data);
+	public abstract void ServerUpdateEntity (string[] data);
+	// Gets
+	public abstract string GetEntityInitializeData();
 	public abstract string GetEntityUpdateData ();
-	public abstract string GetEntityInitializeData ();
+	public abstract string GetServerUpdateData();
+	
 	// RPCs
 	public virtual bool ExecuteClientRPC (string methodName, string[] methodParams) {
 		// Attempts to run a Client sent RPC. If it fails: return false, otherwise: return true

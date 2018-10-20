@@ -56,5 +56,11 @@ public class WeaponDrop : Entity {
 	public override string GetEntityUpdateData() {
 		throw new System.NotImplementedException();
 	}
+	public override void ServerUpdateEntity(string[] data) {
+		throw new System.NotImplementedException();
+	}
+	public override string GetServerUpdateData () {
+		throw new System.NotImplementedException();
+	}
 	#endregion
 }

@@ -230,6 +230,9 @@ MonoBehaviour:
   collisionMask:
     serializedVersion: 2
     m_Bits: 3072
+  playerMask:
+    serializedVersion: 2
+    m_Bits: 1024
   networkPerspective: 2
   parentPlayer: {fileID: 0}
   projectileCollider: {fileID: 0}
@@ -238,6 +241,9 @@ MonoBehaviour:
   projectileAttributes:
     damage: 0
     knockback: NaN
+    isExplosive: 0
+    explosionDamage: 0
+    explosionBlastRadius: 0
     muzzleVelocity: 0
     ricochetCount: 0
     ricochetMaxAngle: 0
@@ -245,10 +251,20 @@ MonoBehaviour:
     bouncinessMin: 0
     bouncinessMax: 0
     entityPenetration: 0
+    isSticky: 0
+    stickyLifespan: 0
+    hasDelayedCollisionDetonation: 0
+    delayedCollisionDetonationTime: 0
     projectileRadius: 0
     trailRendererTime: 0
     lifespan: 0
+    prefab_Explosion: {fileID: 0}
+    clip_Collision: {fileID: 0}
+    clip_Explosion: {fileID: 0}
   projectileId: 0
+  isStuck: 0
+  hasCollided: 0
+  firstCollisionTime: 0
 --- !u!135 &135261797531896488
 SphereCollider:
   m_ObjectHideFlags: 1

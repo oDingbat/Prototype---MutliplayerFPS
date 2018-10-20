@@ -36,10 +36,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4028663975156878}
-  - component: {fileID: 65199816633504608}
+  - component: {fileID: 135588914070689332}
   - component: {fileID: 114908442175849520}
   m_Layer: 13
-  m_Name: ArmorShard
+  m_Name: ArmorShardDrop
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -52,7 +52,7 @@ Transform:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1612542748086348}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -37, y: 3, z: 0}
+  m_LocalPosition: {x: -7.24, y: 16.73, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 4507431835801922}
@@ -114,18 +114,6 @@ MeshFilter:
   m_PrefabInternal: {fileID: 100100000}
   m_GameObject: {fileID: 1169717197140972}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!65 &65199816633504608
-BoxCollider:
-  m_ObjectHideFlags: 1
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 100100000}
-  m_GameObject: {fileID: 1612542748086348}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 1
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 0.5, y: 1, z: 0.5}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &114908442175849520
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -147,24 +135,37 @@ MonoBehaviour:
   entityId: 0
   ownerClientId: 0
   networkPerspective: 0
-  sendGameServerUpdates: 0
+  sendGameServerUpdates: 1
   gameServer: {fileID: 0}
   client: {fileID: 0}
   audioManager: {fileID: 0}
   allowedClientRPCMethodNames: []
+  collider: {fileID: 0}
   pickupModel: {fileID: 1169717197140972}
   lifespan: 0
   respawnTime: 15
   destroyOnPickup: 0
-  prefabPoolIndex: 1
+  prefabPoolIndex: 6
   isRespawning: 0
-  isPhysicsPickup: 0
+  isPhysicsPickup: 1
   collisionMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 2048
   clip_Pickup: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
   clip_Respawn: {fileID: 8300000, guid: ee87716015a891c499a3f2ef8a6424e8, type: 3}
   health: 0
   armor: 10
   overhealPotential: 0
   overarmorPotential: 75
+--- !u!135 &135588914070689332
+SphereCollider:
+  m_ObjectHideFlags: 1
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1612542748086348}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.75
+  m_Center: {x: 0, y: 0, z: 0}

@@ -63,6 +63,7 @@ MonoBehaviour:
   - {fileID: 1063526440404270, guid: 26053dae4bc1bf24cb3a46f104c5e4b4, type: 2}
   - {fileID: 1622265015208090, guid: 27c202cc17f2082468ae5a951c45d2b2, type: 2}
   - {fileID: 1940222380347638, guid: b14e1c402278a364687bd9bba971779d, type: 2}
+  - {fileID: 1612542748086348, guid: 5770661fdb6de834699fa0e4ff285f18, type: 2}
   player: {fileID: 1966871052328652, guid: 9e983d22fe41a7543abba59b3166af59, type: 2}
   ragdoll_Player: {fileID: 1959798011945666, guid: c1f5997582348e14ebf109c215d4c696,
     type: 2}

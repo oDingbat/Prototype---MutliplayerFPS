@@ -11,10 +11,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/MasterServer.unity
     guid: 1d7e7b09ded7de34b9fdcca592961cdd
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/GameServer.unity
     guid: 78e7f9c65ef9bb540b20fe57c8b1ac95
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/Client.unity
     guid: 54841d26b7c705f47a100a75cc93e2dc
   m_configObjects: {}

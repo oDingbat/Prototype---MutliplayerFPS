@@ -1046,6 +1046,7 @@ MonoBehaviour:
   - AttemptSwitchWeapon
   - AttemptDropWeapon
   - TryInteract
+  - CheckProjectileExplosion
   playerName: 
   collisionMask:
     serializedVersion: 2
@@ -1071,7 +1072,7 @@ MonoBehaviour:
       ammoType: Default
       consumption: 1
       automatic: 1
-      firerate: 10
+      firerate: 2
       timeLastFired: 0
       burstCount: 1
       burstDelay: 0
@@ -1083,10 +1084,14 @@ MonoBehaviour:
     projectileAttributes:
       damage: 25
       knockback: 2
-      muzzleVelocity: 150
-      ricochetCount: 10
-      ricochetMaxAngle: 180
-      gravityScale: 1
+      isExplosive: 1
+      explosionDamage: 50
+      explosionBlastRadius: 2.25
+      explosionKnockback: 25
+      muzzleVelocity: 750
+      ricochetCount: 0
+      ricochetMaxAngle: 0
+      gravityScale: 0
       bouncinessMin: 1
       bouncinessMax: 1
       entityPenetration: 1
@@ -1097,6 +1102,9 @@ MonoBehaviour:
       projectileRadius: 0.1
       trailRendererTime: 0.05
       lifespan: 5
+      prefab_Explosion: {fileID: 0}
+      clip_Collision: {fileID: 0}
+      clip_Explosion: {fileID: 0}
     clip_Fire: {fileID: 8300000, guid: 8afc02d3b3dee9048a25425087851387, type: 3}
     prefab_Projectile: {fileID: 4285405437014306, guid: 9e3827f6e8d79674881a661771531ff2,
       type: 2}

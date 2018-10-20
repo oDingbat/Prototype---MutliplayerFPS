@@ -195,10 +195,12 @@ MonoBehaviour:
   entityId: 0
   ownerClientId: 0
   networkPerspective: 0
+  sendGameServerUpdates: 1
   gameServer: {fileID: 0}
   client: {fileID: 0}
   audioManager: {fileID: 0}
   allowedClientRPCMethodNames: []
+  rigidbody: {fileID: 0}
 --- !u!136 &136030638290092050
 CapsuleCollider:
   m_ObjectHideFlags: 1

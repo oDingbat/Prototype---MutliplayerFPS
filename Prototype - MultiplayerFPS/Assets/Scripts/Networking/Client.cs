@@ -212,6 +212,10 @@ public class Client : MonoBehaviour {
 				case "Data_ExecuteRPC":
 					Receive_Data_ExecuteRPC(splitData);
 					break;
+
+				case "Data_UpdateServerEntities":
+					Receive_Data_UpdateServerEntities(splitData);
+					break;
 			}
 		}
 	}
@@ -313,6 +317,20 @@ public class Client : MonoBehaviour {
 		
 		// Call specified entity's ExecuteRPC method
 		entities[entityId].ExecuteRPC(rpcMethodName, rpcMethodParams);
+	}
+	private void Receive_Data_UpdateServerEntities(string[] splitData) {
+
+		string[] allEntityUpdateDatas = splitData[1].Split('%');
+
+		foreach (string entityUpdateData in allEntityUpdateDatas) {
+			string[] splitEntityUpdateData = entityUpdateData.Split('$');
+			
+			int thisEntityId = int.Parse(splitEntityUpdateData[0]);
+
+			if (entities.ContainsKey(thisEntityId)) {			// Make sure this entity exists
+				entities[thisEntityId].ServerUpdateEntity(splitEntityUpdateData);
+			}
+		}
 	}
 	private void Receive_Error_IncorrectVersionNumber (int connectionId, string[] splitData) {
 		Debug.Log(splitData[0]);
